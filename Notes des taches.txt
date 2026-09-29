@@ -1,0 +1,141 @@
+Du 22 au 24 AVRIL :
+1. Amelioration de sidebar icons, supprimer Paiement cash et fixation et quelques effets stylés
+2. Ajout deux btn Paiement cash et fixation dans Paiement
+3. Dashboard admin ajout une salutation à l'user connecter
+4. Ameliorer la page add classe qui enregistrer seulement la classe mais elle commence aussi ca prend aussi en charge la modification
+5. Gestion du mises à jour de la page classe(Update et delete d'une classe ciblée)
+6. Ajoute deux btn dans la liste des écoles coté visiteurs ils peuvents s'inscrire ou voir les détailles de l'écoles 
+7. Add base des données : ALTER TABLE classes ADD COLUMN status TINYINT(1) NOT NULL DEFAULT 1;
+
+DU 23 au 
+A executer dans la DATA : 
+CREATE TABLE depenses(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code_ecole VARCHAR(50) NOT NULL,
+    beneficiaire VARCHAR(20) NOT NULL,
+    description TEXT NULL,
+    montant DECIMAL(10, 2) NOT NULL,
+    date_depense DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE class_subject_teacher
+DROP INDEX uq_cst_unique_class; 
+
+ALTER TABLE class_subject_teacher
+ADD UNIQUE KEY uq_class_teacher (class_id, teacher_user_id);
+
+ALTER TABLE class_subject_teacher
+DROP COLUMN username,
+DROP COLUMN password;
+
+ALTER TABLE class_subject_teacher
+DROP COLUMN username,
+DROP COLUMN password;
+
+ALTER TABLE `class_subject_teacher` ADD `username` VARCHAR(50) NOT NULL DEFAULT 'MyKelasi' AFTER `teacher_user_id`;
+
+ALTER TABLE `class_subject_teacher` ADD CONSTRAINT `fk_cst_user` FOREIGN KEY (`teacher_user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE cours ADD COLUMN teacher_user_id INT NOT NULL AFTER class;
+
+ALTER TABLE `cours` ADD CONSTRAINT `fk_cours_teacher` FOREIGN KEY (`teacher_user_id`) REFERENCES `class_subject_teacher`(`teacher_user_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+1. Gestion des dépenses
+2. Ajouter de la page setting avec les btn pour les navigations,
+3. Page controle pour les suivis de frais scolaire
+4. Page Report pour la gestion des rapport d'établissement
+5. Gestion d'une classe qui doit être occupée par un ou plusieurs profs.
+6. Gestion des cours, lecons et ses contenus(image, pdf, video et audio)
+
+#18.MAI.2026
+
+CREATE TABLE horaires (
+
+    id INT(11) NOT NULL AUTO_INCREMENT,
+
+    class_id INT(11) NOT NULL,
+
+    heure_debut TIME NOT NULL,
+    heure_fin TIME NOT NULL,
+
+    lundi VARCHAR(255) DEFAULT NULL,
+    mardi VARCHAR(255) DEFAULT NULL,
+    mercredi VARCHAR(255) DEFAULT NULL,
+    jeudi VARCHAR(255) DEFAULT NULL,
+    vendredi VARCHAR(255) DEFAULT NULL,
+    samedi VARCHAR(255) DEFAULT NULL,
+
+    code_ecole VARCHAR(11) NOT NULL,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+
+    KEY idx_horaire_class (class_id),
+    KEY idx_horaire_ecole (code_ecole),
+
+    CONSTRAINT fk_horaire_class
+        FOREIGN KEY (class_id)
+        REFERENCES classes(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_horaire_ecole
+        FOREIGN KEY (code_ecole)
+        REFERENCES ecoles(code_ecole)
+        ON UPDATE CASCADE
+
+) ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE presence_eleve (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    eleve_id INT NOT NULL,
+    class_id INT NOT NULL,
+    date_presence DATE NOT NULL,
+    statut ENUM('present','absent','retard') DEFAULT 'present',
+    commentaire TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX (eleve_id),
+    INDEX (class_id),
+    INDEX (date_presence)
+);
+
+1. Ajout de la page horaire pour permettre à l'admin de créer l'horaire des différentes classes.
+2. Hidden preloader dans forgot.php
+3. Add btn imprimer recu et la page d'impression 
+4. dans settin show du btn horaire 
+5. N'importe quelle la classe  peut etre modifier sans bloquer la suite
+6. Ajout page pour historique de paiement et le paiement du jour 
+7. Gestion des précense chez admin et élève pour la consultation, et le prof pour l'enregistrement
+
+#Mises à jour pour le 20.05
+1. Ajoute la page horaire de cours chez le prof, eleve et l'afficher dans sidebar;
+2. Corretion de la page controle pour qu'il soit afficher
+3. Admin gère les cours (créer, modifier, supprimer, affecter les cours chez un autre prof, ou dans une classe et l'ouvert le cours)
+4. Masquer preloader dans autres pages 
+5. Ajouter dans le menu sidebar le lien pour les pages 
+
+#Mises à jour 01.06
+executer dans data : 
+    ALTER TABLE class_subject_teacher
+    ADD titulaire TINYINT(1) NOT NULL DEFAULT 0
+    AFTER teacher_user_id;
+
+1. Effectuer le paiement en présentiel
+2. Possibilité d'assigner un enseignant comme titulaire d'une classe
+
+#MAJ 23.06
+1.Modification élève
+2. Changement du nom colonne titulaire => status
+3. Mises en place de la page voir detail pour l'eleve chez l'admin qu'il puisse voir les détails de l'élève(Informations de l'élève, Responsables, Situation financière)
+4. Correction pour l'affichage de differnent frais en apercu
+5. Correction pour le mouvement de paiement avec une precision de connaitre montant à payer, payé et reste
+6. Eleve peut lire les contenus d'une lecons 
+7. L'élève peut consulter sa précense
+
+ Get-ChildItem -File | Rename-Item -NewName {$_.name -replace ' ', '_'}
+ ALTER TABLE `students` ADD `id_user` INT NOT NULL AFTER `statut`;

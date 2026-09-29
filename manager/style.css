@@ -1,0 +1,22 @@
+/* .form {
+    height: 100%;
+    /* width: 100vh; */
+/* margin-left: 15%; */
+/* } */
+.form-group {
+    margin-left: 2vb;
+} 
+
+.form {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    /* width: 100%; */
+    max-width: 100%;
+}
+
+h2 {
+    text-align: center;
+    color: #333;
+} 
