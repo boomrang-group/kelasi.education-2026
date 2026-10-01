@@ -73,8 +73,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             if ($u) {
                 $stored = (string)$u['password'];
-                $is_legacy = (strlen($stored) < 60 && hash_equals($stored, $password));
-                $is_ok = password_verify($password, $stored) || $is_legacy;
+                // Security fix: strictly enforce password_verify() and prevent plaintext comparison
+                $is_ok = password_verify($password, $stored);
 
                 if ($is_ok) {
                     // Init session
@@ -116,12 +116,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         } catch (Throwable $e) {}
                     }
 
-                    // If legacy password, force change
-                    if ($is_legacy) {
-                        $_SESSION['force_password_change'] = true;
-                        header('Location: force_reset.php');
-                        exit;
-                    }
 
                     // 🟢 [CORRECTION 2] Lier Users → Students & mettre à jour id_user
                     if ($_SESSION['role'] === 'eleve') {
