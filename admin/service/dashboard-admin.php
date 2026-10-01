@@ -66,31 +66,36 @@ if ($codeEcole === '') {
 }
 
 try {
-    // KPIs
-    $nbre_classe = (int) fetch_scalar($pdo, "SELECT COUNT(*) FROM classes  WHERE code_ecole = :ce", [':ce'=>$codeEcole], 0);
-    $nbre_prof   = (int) fetch_scalar($pdo, "SELECT COUNT(*) FROM teacher  WHERE code_ecole = :ce", [':ce'=>$codeEcole], 0);
-    $nbre_eleve  = (int) fetch_scalar($pdo, "SELECT COUNT(*) FROM students WHERE code_ecole = :ce", [':ce'=>$codeEcole], 0);
+    // ⚡ Bolt Optimization: Consolidate KPI counts into 1 single query instead of 3 roundtrips
+    $kpiRow = fetch_all(
+        $pdo,
+        "SELECT
+            (SELECT COUNT(*) FROM classes  WHERE code_ecole = :ce) AS nbre_classe,
+            (SELECT COUNT(*) FROM teacher  WHERE code_ecole = :ce) AS nbre_prof,
+            (SELECT COUNT(*) FROM students WHERE code_ecole = :ce) AS nbre_eleve",
+        [':ce' => $codeEcole]
+    )[0] ?? [];
 
-    // Finances — ventilation
-    $somme_inscription = (float) fetch_scalar(
+    $nbre_classe = (int)($kpiRow['nbre_classe'] ?? 0);
+    $nbre_prof   = (int)($kpiRow['nbre_prof'] ?? 0);
+    $nbre_eleve  = (int)($kpiRow['nbre_eleve'] ?? 0);
+
+    // ⚡ Bolt Optimization: Consolidate 3 separate financial aggregation queries into 1 conditional SUM query
+    $finRow = fetch_all(
         $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0) FROM paiement WHERE code_ecole=:ce AND statut='Inscription'",
-        [':ce'=>$codeEcole], 0.0
-    );
-    $somme_minerval = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0) FROM paiement WHERE code_ecole=:ce AND statut='Minerval'",
-        [':ce'=>$codeEcole], 0.0
-    );
-    $somme_autres = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0)
+        "SELECT
+            COALESCE(SUM(CASE WHEN statut = 'Inscription' THEN montant_paye ELSE 0 END), 0) AS somme_inscription,
+            COALESCE(SUM(CASE WHEN statut = 'Minerval' THEN montant_paye ELSE 0 END), 0) AS somme_minerval,
+            COALESCE(SUM(CASE WHEN (statut = 'Autre' OR (statut IS NOT NULL AND statut <> '' AND statut NOT IN ('Inscription','Minerval'))) THEN montant_paye ELSE 0 END), 0) AS somme_autres
            FROM paiement
-          WHERE code_ecole=:ce
-            AND ( statut='Autre' OR (statut IS NOT NULL AND statut<>'' AND statut NOT IN ('Inscription','Minerval')) )",
-        [':ce'=>$codeEcole], 0.0
-    );
-    $finance_total = $somme_inscription + $somme_minerval + $somme_autres;
+          WHERE code_ecole = :ce",
+        [':ce' => $codeEcole]
+    )[0] ?? [];
+
+    $somme_inscription = (float)($finRow['somme_inscription'] ?? 0.0);
+    $somme_minerval    = (float)($finRow['somme_minerval'] ?? 0.0);
+    $somme_autres      = (float)($finRow['somme_autres'] ?? 0.0);
+    $finance_total     = $somme_inscription + $somme_minerval + $somme_autres;
 
     // Séries 6 derniers mois
     $rows6 = fetch_all(
