@@ -54,7 +54,7 @@ function findStudent(PDO $pdo, ?string $email, ?string $username, ?string $codeE
     return null;
 }
 
-// --- Charger Cours + Leçons (triées)
+// --- Charger Cours + Leçons (triées) - Optimisé en batch (O(1) requêtes leçons)
 function getCoursesAndLessons(PDO $pdo, int $classId, ?string $codeEcole): array {
     $out=[];
     try{
@@ -65,27 +65,102 @@ function getCoursesAndLessons(PDO $pdo, int $classId, ?string $codeEcole): array
         $stC->execute($pC);
         $courses=$stC->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach($courses as $c){
-            $sqlL="SELECT id, titre, ordre FROM lecons WHERE cours_id=:cid ORDER BY ordre, id";
-            $stL=$pdo->prepare($sqlL);
-            $stL->execute([':cid'=>$c['id']]);
-            $less=$stL->fetchAll(PDO::FETCH_ASSOC);
+        if (!$courses) return [];
 
+        // Pré-charger toutes les leçons pour l'ensemble des cours de la classe
+        $cids = array_map(fn($c)=>(int)$c['id'], $courses);
+        $in = implode(',', array_fill(0, count($cids), '?'));
+        $sqlL="SELECT id, cours_id, titre, ordre FROM lecons WHERE cours_id IN ($in) ORDER BY ordre, id";
+        $stL=$pdo->prepare($sqlL);
+        $stL->execute($cids);
+        $allLessons=$stL->fetchAll(PDO::FETCH_ASSOC);
+
+        $lessonsByCourse = [];
+        foreach ($allLessons as $r) {
+            $lessonsByCourse[(int)$r['cours_id']][] = [
+                'lecon_id' => (int)$r['id'],
+                'lecon_titre' => $r['titre'],
+                'lecon_ordre' => (int)$r['ordre']
+            ];
+        }
+
+        foreach($courses as $c){
+            $cid = (int)$c['id'];
             $out[]=[
-                'course_id'=>(int)$c['id'],
+                'course_id'=>$cid,
                 'course_name'=>$c['nom'],
-                'lessons'=>array_map(fn($r)=>[
-                    'lecon_id'=>(int)$r['id'],
-                    'lecon_titre'=>$r['titre'],
-                    'lecon_ordre'=>(int)$r['ordre']
-                ],$less)
+                'lessons'=>$lessonsByCourse[$cid] ?? []
             ];
         }
     }catch(Throwable $e){}
     return $out;
 }
 
-// --- Trouver quiz publié d'une leçon (voir stratégie en haut)
+// Batch prefetch des quiz publiés de la classe (1 seule requête SQL au lieu de N queries par leçon)
+function getPublishedQuizzesForClass(PDO $pdo, int $classId, ?string $codeEcole): array {
+    try {
+        $sql = "SELECT * FROM quizzes WHERE class_id=:cid ".($codeEcole?'AND code_ecole=:ce ':'')." AND is_published=1 ORDER BY created_at DESC, id DESC";
+        $st = $pdo->prepare($sql);
+        $p = [':cid' => $classId]; if ($codeEcole) $p[':ce'] = $codeEcole;
+        $st->execute($p);
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
+// Batch prefetch des soumissions d'un élève (1 seule requête SQL au lieu de N queries par quiz)
+function getStudentSubmissionsMap(PDO $pdo, int $studentId): array {
+    $map = [];
+    try {
+        $st = $pdo->prepare("SELECT quiz_id, STATUS, score_obtained FROM quiz_submissions WHERE student_id=:sid ORDER BY submitted_at DESC, id DESC");
+        $st->execute([':sid' => $studentId]);
+        while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+            $qid = (int)$r['quiz_id'];
+            if (!isset($map[$qid])) {
+                $map[$qid] = $r; // Conserver la soumission la plus récente par quiz
+            }
+        }
+    } catch (Throwable $e) {}
+    return $map;
+}
+
+// Trouver quiz publié dans la liste pré-chargée (recherche en mémoire sans requête DB)
+function findPublishedLessonQuizFromList(array $publishedQuizzes, string $courseName, string $lessonTitle): ?array {
+    $t1 = 'quiz — ' . mb_strtolower($lessonTitle, 'UTF-8');
+    foreach ($publishedQuizzes as $q) {
+        $titleLower = mb_strtolower($q['title'] ?? '', 'UTF-8');
+        if (mb_strpos($titleLower, $t1) === 0) {
+            return $q;
+        }
+    }
+    $prefixLower = mb_strtolower($courseName . ' - ' . $lessonTitle . ' - ', 'UTF-8');
+    foreach ($publishedQuizzes as $q) {
+        $descLower = mb_strtolower($q['description'] ?? '', 'UTF-8');
+        if (mb_strpos($descLower, $prefixLower) === 0) {
+            return $q;
+        }
+    }
+    return null;
+}
+
+// Calcul du statut de passage depuis la soumission pré-chargée
+function studentPassedQuizFromMap(?array $submission, int $overall): array {
+    $res = ['has_submission' => false, 'passed' => false, 'score' => null];
+    if ($submission) {
+        $statusVal = (string)($submission['status'] ?? $submission['STATUS'] ?? '');
+        $res['has_submission'] = in_array(strtolower($statusVal), ['submitted', 'graded'], true);
+        $res['score'] = is_null($submission['score_obtained']) ? null : (int)$submission['score_obtained'];
+        if (!REQUIRE_MIN_SCORE) {
+            $res['passed'] = $res['has_submission'];
+        } else {
+            if ($res['has_submission'] && !is_null($res['score']) && $overall > 0) {
+                $res['passed'] = ($res['score'] >= ceil($overall * PASS_MIN_PCT));
+            }
+        }
+    }
+    return $res;
+}
+
+// --- Fallback direct DB : Trouver quiz publié d'une leçon (conservé pour rétrocompatibilité)
 function findPublishedLessonQuiz(PDO $pdo, int $classId, ?string $codeEcole, string $courseName, string $lessonTitle): ?array {
     try {
         // 1) title LIKE "Quiz — <lessonTitle>%"
@@ -113,7 +188,7 @@ function findPublishedLessonQuiz(PDO $pdo, int $classId, ?string $codeEcole, str
     return null;
 }
 
-// --- L'élève a-t-il "passé" le quiz ?
+// --- Fallback direct DB : L'élève a-t-il "passé" le quiz ? (conservé pour rétrocompatibilité)
 function studentPassedQuiz(PDO $pdo, int $quizId, int $studentId, int $overall): array {
     // return ['has_submission'=>bool,'passed'=>bool,'score'=>int|null]
     $res=['has_submission'=>false,'passed'=>false,'score'=>null];
@@ -151,14 +226,20 @@ if(!$student){
     $studentId=(int)$student['id'];
     $courses=getCoursesAndLessons($pdo, $classId, $code_ecole);
 
+    // Pré-charger en batch tous les quiz et toutes les soumissions en 2 requêtes SQL totales
+    $publishedQuizzes = getPublishedQuizzesForClass($pdo, $classId, $code_ecole);
+    $submissionsMap = getStudentSubmissionsMap($pdo, $studentId);
+
     // Pour chaque cours, associer quiz et état de verrouillage
     foreach($courses as &$course){
         $lessons=&$course['lessons'];
-        // Pré-charger quiz de chaque leçon
+        // Associer quiz de chaque leçon via la liste pré-chargée (0 requêtes SQL supplémentaires)
         foreach($lessons as &$L){
-            $quiz=findPublishedLessonQuiz($pdo, $classId, $code_ecole, $course['course_name'], $L['lecon_titre']);
+            $quiz=findPublishedLessonQuizFromList($publishedQuizzes, $course['course_name'], $L['lecon_titre']);
             if ($quiz){
-                $st=studentPassedQuiz($pdo, (int)$quiz['id'], $studentId, (int)$quiz['overall_score']);
+                $qid = (int)$quiz['id'];
+                $sub = $submissionsMap[$qid] ?? null;
+                $st=studentPassedQuizFromMap($sub, (int)$quiz['overall_score']);
                 $L['quiz']=[
                     'id'=>(int)$quiz['id'],
                     'overall'=>(int)$quiz['overall_score'],
