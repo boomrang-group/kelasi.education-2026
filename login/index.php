@@ -73,8 +73,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             if ($u) {
                 $stored = (string)$u['password'];
-                $is_legacy = (strlen($stored) < 60 && hash_equals($stored, $password));
-                $is_ok = password_verify($password, $stored) || $is_legacy;
+                // Security Fix (V02): Only verify passwords using standard password_verify()
+                // Do not fallback to plaintext comparison (hash_equals) for unhashed/legacy passwords.
+                $is_ok = password_verify($password, $stored);
 
                 if ($is_ok) {
                     // Init session
@@ -114,13 +115,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                 $_SESSION['postnom_responsable'] = $ecole['postnom_responsable'] ?? '';
                             }
                         } catch (Throwable $e) {}
-                    }
-
-                    // If legacy password, force change
-                    if ($is_legacy) {
-                        $_SESSION['force_password_change'] = true;
-                        header('Location: force_reset.php');
-                        exit;
                     }
 
                     // 🟢 [CORRECTION 2] Lier Users → Students & mettre à jour id_user
