@@ -71,25 +71,23 @@ try {
     $nbre_prof   = (int) fetch_scalar($pdo, "SELECT COUNT(*) FROM teacher  WHERE code_ecole = :ce", [':ce'=>$codeEcole], 0);
     $nbre_eleve  = (int) fetch_scalar($pdo, "SELECT COUNT(*) FROM students WHERE code_ecole = :ce", [':ce'=>$codeEcole], 0);
 
-    // Finances — ventilation
-    $somme_inscription = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0) FROM paiement WHERE code_ecole=:ce AND statut='Inscription'",
-        [':ce'=>$codeEcole], 0.0
-    );
-    $somme_minerval = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0) FROM paiement WHERE code_ecole=:ce AND statut='Minerval'",
-        [':ce'=>$codeEcole], 0.0
-    );
-    $somme_autres = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0)
-           FROM paiement
-          WHERE code_ecole=:ce
-            AND ( statut='Autre' OR (statut IS NOT NULL AND statut<>'' AND statut NOT IN ('Inscription','Minerval')) )",
-        [':ce'=>$codeEcole], 0.0
-    );
+    // ⚡ Bolt Optimization: Consolidate 3 separate financial queries into a single query with conditional aggregation.
+    // Reduces database roundtrips from 3 to 1 and scans the paiement table once instead of 3 times.
+    $sqlFinances = "
+        SELECT
+            COALESCE(SUM(CASE WHEN statut = 'Inscription' THEN montant_paye ELSE 0 END), 0) AS somme_inscription,
+            COALESCE(SUM(CASE WHEN statut = 'Minerval' THEN montant_paye ELSE 0 END), 0) AS somme_minerval,
+            COALESCE(SUM(CASE WHEN statut = 'Autre' OR (statut IS NOT NULL AND statut <> '' AND statut NOT IN ('Inscription','Minerval')) THEN montant_paye ELSE 0 END), 0) AS somme_autres
+        FROM paiement
+        WHERE code_ecole = :ce
+    ";
+    $stFinances = $pdo->prepare($sqlFinances);
+    $stFinances->execute([':ce' => $codeEcole]);
+    $rowFinances = $stFinances->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $somme_inscription = (float) ($rowFinances['somme_inscription'] ?? 0.0);
+    $somme_minerval    = (float) ($rowFinances['somme_minerval'] ?? 0.0);
+    $somme_autres      = (float) ($rowFinances['somme_autres'] ?? 0.0);
     $finance_total = $somme_inscription + $somme_minerval + $somme_autres;
 
     // Séries 6 derniers mois
