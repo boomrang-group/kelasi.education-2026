@@ -71,26 +71,22 @@ try {
     $nbre_prof   = (int) fetch_scalar($pdo, "SELECT COUNT(*) FROM teacher  WHERE code_ecole = :ce", [':ce'=>$codeEcole], 0);
     $nbre_eleve  = (int) fetch_scalar($pdo, "SELECT COUNT(*) FROM students WHERE code_ecole = :ce", [':ce'=>$codeEcole], 0);
 
-    // Finances — ventilation
-    $somme_inscription = (float) fetch_scalar(
+    // Finances — ventilation (optimized: single query with conditional aggregation instead of 3 queries)
+    $totalsRow = fetch_all(
         $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0) FROM paiement WHERE code_ecole=:ce AND statut='Inscription'",
-        [':ce'=>$codeEcole], 0.0
-    );
-    $somme_minerval = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0) FROM paiement WHERE code_ecole=:ce AND statut='Minerval'",
-        [':ce'=>$codeEcole], 0.0
-    );
-    $somme_autres = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0)
+        "SELECT
+            COALESCE(SUM(CASE WHEN statut = 'Inscription' THEN montant_paye ELSE 0 END), 0) AS s_ins,
+            COALESCE(SUM(CASE WHEN statut = 'Minerval' THEN montant_paye ELSE 0 END), 0) AS s_min,
+            COALESCE(SUM(CASE WHEN statut = 'Autre' OR (statut IS NOT NULL AND statut <> '' AND statut NOT IN ('Inscription', 'Minerval')) THEN montant_paye ELSE 0 END), 0) AS s_aut
            FROM paiement
-          WHERE code_ecole=:ce
-            AND ( statut='Autre' OR (statut IS NOT NULL AND statut<>'' AND statut NOT IN ('Inscription','Minerval')) )",
-        [':ce'=>$codeEcole], 0.0
+          WHERE code_ecole = :ce",
+        [':ce' => $codeEcole]
     );
-    $finance_total = $somme_inscription + $somme_minerval + $somme_autres;
+
+    $somme_inscription = isset($totalsRow[0]['s_ins']) ? (float)$totalsRow[0]['s_ins'] : 0.0;
+    $somme_minerval    = isset($totalsRow[0]['s_min']) ? (float)$totalsRow[0]['s_min'] : 0.0;
+    $somme_autres      = isset($totalsRow[0]['s_aut']) ? (float)$totalsRow[0]['s_aut'] : 0.0;
+    $finance_total     = $somme_inscription + $somme_minerval + $somme_autres;
 
     // Séries 6 derniers mois
     $rows6 = fetch_all(
