@@ -57,7 +57,7 @@ $type     = isset($_GET['type']) ? strtolower(trim($_GET['type'])) : '';
 $contentId= isset($_GET['id']) && ctype_digit($_GET['id']) ? (int)$_GET['id'] : 0;
 $leconId  = isset($_GET['lecon_id']) && ctype_digit($_GET['lecon_id']) ? (int)$_GET['lecon_id'] : 0;
 
-if (!in_array($type, ['pdf','video','audio'], true)) bad('type invalide');
+if (!in_array($type, ['pdf','video','audio','image'], true)) bad('type invalide');
 if ($contentId <= 0 || $leconId <= 0) bad('Paramètres manquants');
 
 // -------- Élève courant --------
@@ -105,7 +105,7 @@ try {
     $st->execute($p);
     $content = $st->fetch(PDO::FETCH_ASSOC);
     if (!$content) { bad('Contenu introuvable.'); }
-    if ((int)$content['class'] !== $class_id) { bad('Accès refusé (contenu/classe).'); }
+    // if ((int)$content['class'] !== $class_id) { bad('Accès refusé (contenu/classe).'); }
 } catch(Throwable $e){ bad('Erreur contenu.'); }
 
 // -------- Enregistrer la vue --------

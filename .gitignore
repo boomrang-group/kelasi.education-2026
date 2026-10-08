@@ -48,6 +48,8 @@ yarn-error.log*
 # ==========================================
 # Uploads / Médias utilisateurs
 # ==========================================
-# Décommentez la ligne ci-dessous si vous avez un dossier d'images/documents envoyés par les utilisateurs
-# /uploads/*
-# !/uploads/.gitkeep
+# Ignore tout le dossier upload-s et son contenu (sous-dossiers inclus)
+uploads/**
+!uploads/**/.gitkeep
+upload/**
+!upload/**/.gitkeep

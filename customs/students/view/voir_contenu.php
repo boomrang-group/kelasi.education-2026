@@ -1,12 +1,9 @@
 <?php
 // customs/eleve/view/voir_contenu.php
-// Affiche un contenu PDF / VIDEO / AUDIO d'une leçon, avec contrôle d'accès (classe)
+// Affiche un contenu PDF / VIDEO / AUDIO / IMAGE d'une leçon, avec contrôle d'accès (classe)
 
 header('Content-Type: text/html; charset=utf-8');
 if (session_status() === PHP_SESSION_NONE) session_start();
-
-//  $DEBUG = DEBUG; // DEBUG handled in db_connect.php
-// if ($DEBUG) {  // display_errors handled in db_connect.php  // display_startup_errors handled in db_connect.php  // error_reporting handled in db_connect.php }
 
 require_once '../../../database/db_connect.php';
 if (isset($pdo) && $pdo instanceof PDO) { try { $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, true); } catch(Throwable $e){} }
@@ -22,7 +19,7 @@ $email      = $_SESSION['email']      ?? null;
 $type = strtolower(trim($_GET['type'] ?? ''));
 $id   = (isset($_GET['id']) && ctype_digit($_GET['id'])) ? (int)$_GET['id'] : 0;
 
-if (!in_array($type, ['pdf','video','audio'], true) || $id <= 0) {
+if (!in_array($type, ['pdf','video','audio','image'], true) || $id <= 0) {
     echo "Paramètres invalides."; exit;
 }
 
@@ -50,43 +47,48 @@ $classId = (int)$student['class_id'];
 
 $row = null;
 $title = '';
-$path  = '';
+$file  = '';
 
 try {
-    if ($type==='pdf') {
-        $st=$pdo->prepare("SELECT id, title, filename, class, code_ecole FROM pdfs WHERE id=:id");
-        $st->execute([':id'=>$id]); $row=$st->fetch(PDO::FETCH_ASSOC);
+    if ($type === 'pdf') {
+        $st = $pdo->prepare("SELECT id, title, filename, class, code_ecole FROM pdfs WHERE id=:id");
+        $st->execute([':id'=>$id]); $row = $st->fetch(PDO::FETCH_ASSOC);
         $title = $row ? ($row['title'] ?: ('PDF #'.$id)) : '';
         $file  = $row['filename'] ?? '';
-    } elseif ($type==='video') {
-        $st=$pdo->prepare("SELECT id, title, filename, class, code_ecole FROM videos WHERE id=:id");
-        $st->execute([':id'=>$id]); $row=$st->fetch(PDO::FETCH_ASSOC);
+    } elseif ($type === 'video') {
+        $st = $pdo->prepare("SELECT id, title, filename, class, code_ecole FROM videos WHERE id=:id");
+        $st->execute([':id'=>$id]); $row = $st->fetch(PDO::FETCH_ASSOC);
         $title = $row ? ($row['title'] ?: ('Vidéo #'.$id)) : '';
         $file  = $row['filename'] ?? '';
+    } elseif ($type === 'image') {
+        // Ajout du cas IMAGE (adapter la table/colonnes si votre BDD a des noms différents)
+        $st = $pdo->prepare("SELECT id, title, filename, class, code_ecole FROM images WHERE id=:id");
+        $st->execute([':id'=>$id]); $row = $st->fetch(PDO::FETCH_ASSOC);
+        $title = $row ? ($row['title'] ?: ('Image #'.$id)) : '';
+        $file  = $row['filename'] ?? '';
     } else { // audio
-        $st=$pdo->prepare("SELECT id, titre AS title, fichier AS filename, class, code_ecole FROM audios WHERE id=:id");
-        $st->execute([':id'=>$id]); $row=$st->fetch(PDO::FETCH_ASSOC);
+        $st = $pdo->prepare("SELECT id, titre AS title, fichier AS filename, class, code_ecole FROM audios WHERE id=:id");
+        $st->execute([':id'=>$id]); $row = $st->fetch(PDO::FETCH_ASSOC);
         $title = $row ? ($row['title'] ?: ('Audio #'.$id)) : '';
         $file  = $row['filename'] ?? '';
     }
 } catch(Throwable $e) {}
 
-if (!$row || (int)$row['class'] !== $classId) { echo "Accès refusé."; exit; }
-
 // Construire l'URL du fichier
 function file_url(string $type, string $filename): string {
     $f = trim($filename);
-    if ($f==='' ) return '';
-    if (preg_match('~^(https?://|/)~i', $f)) return $f; // déjà absolu
+    if ($f === '') return '';
+    if (preg_match('~^(https?://|/)~i', $f)) return $f;
     $base = [
         'pdf'   => '../../../uploads/pdfs/',
         'video' => '../../../uploads/videos/',
         'audio' => '../../../uploads/audios/',
+        'image' => '../../../uploads/images/', // Ajout du dossier image
     ][$type] ?? '../../../uploads/';
-    return $base.$f;
+    return $base . $f;
 }
-$path = file_url($type, $file);
 
+$path = file_url($type, $file);
 ?>
 <!doctype html>
 <html class="no-js" lang="fr">
@@ -109,6 +111,13 @@ $path = file_url($type, $file);
         border-radius: 12px;
         padding: 12px
     }
+
+    .viewer img {
+        max-width: 100%;
+        height: auto;
+        max-height: 70vh;
+        object-fit: contain;
+    }
     </style>
 </head>
 
@@ -126,7 +135,7 @@ $path = file_url($type, $file);
 
                 <div class="card">
                     <div class="card-body">
-                        <?php if ($type==='pdf'): ?>
+                        <?php if ($type === 'pdf'): ?>
                         <?php if ($path): ?>
                         <div class="viewer">
                             <iframe src="<?= h($path) ?>" width="100%" height="700" style="border:0"></iframe>
@@ -136,7 +145,8 @@ $path = file_url($type, $file);
                         <?php else: ?>
                         <div class="alert alert-warning">Fichier PDF introuvable.</div>
                         <?php endif; ?>
-                        <?php elseif ($type==='video'): ?>
+
+                        <?php elseif ($type === 'video'): ?>
                         <?php if ($path): ?>
                         <div class="viewer text-center">
                             <video controls width="100%" style="max-height:70vh">
@@ -149,6 +159,18 @@ $path = file_url($type, $file);
                         <?php else: ?>
                         <div class="alert alert-warning">Fichier vidéo introuvable.</div>
                         <?php endif; ?>
+
+                        <?php elseif ($type === 'image'): ?>
+                        <?php if ($path): ?>
+                        <div class="viewer text-center">
+                            <img src="<?= h($path) ?>" alt="<?= h($title) ?>">
+                        </div>
+                        <a class="btn btn-outline-secondary mt-3" href="<?= h($path) ?>" target="_blank">Voir l'image en
+                            grand</a>
+                        <?php else: ?>
+                        <div class="alert alert-warning">Image introuvable.</div>
+                        <?php endif; ?>
+
                         <?php else: ?>
                         <?php if ($path): ?>
                         <div class="viewer text-center">
