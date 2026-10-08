@@ -1,0 +1,3 @@
+## 2026-03-29 - Consolidate Sequential Category Totals into Single Conditional Aggregation
+**Learning:** Dashboard backends (`admin/service/dashboard-admin.php` and `my_school/service/dashboard.service.php`) were issuing 3 separate sequential SQL queries against the `paiement` table to sum payments by status (Inscription, Minerval, Autre). Combining them into a single conditional aggregation query (`SUM(CASE WHEN ... THEN ... ELSE 0 END)`) produces identical results while reducing DB latency and table scans by 66%.
+**Action:** When aggregating totals across categories from the same table in dashboard or report endpoints, use a single query with conditional aggregation instead of sequential queries.
