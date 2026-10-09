@@ -11,66 +11,76 @@ require_once '../database/db_connect.php';
 $errors = [];
 $success = '';
 
+// CSRF Token Generation
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $identifier = trim($_POST['identifier'] ?? '');
-
-    if ($identifier === '') {
-        $errors[] = "Veuillez entrer votre e-mail ou nom d'utilisateur.";
+    // CSRF Validation
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        $errors[] = "Erreur de validation CSRF.";
     } else {
-        try {
-            // Vérifier si user existe
-            $is_email = filter_var($identifier, FILTER_VALIDATE_EMAIL);
-            $field = $is_email ? 'email' : 'username';
+        $identifier = trim($_POST['identifier'] ?? '');
 
-            $stmt = $pdo->prepare("SELECT id, email FROM users WHERE $field = :id LIMIT 1");
-            $stmt->execute([':id' => $identifier]);
-            $user = $stmt->fetch();
+        if ($identifier === '') {
+            $errors[] = "Veuillez entrer votre e-mail ou nom d'utilisateur.";
+        } else {
+            try {
+                // Vérifier si user existe
+                $is_email = filter_var($identifier, FILTER_VALIDATE_EMAIL);
+                $field = $is_email ? 'email' : 'username';
 
-            if ($user) {
-                // Générer token
-                $token = bin2hex(random_bytes(32));
-                $expires = (new DateTime('+1 hour'))->format('Y-m-d H:i:s');
+                $stmt = $pdo->prepare("SELECT id, email FROM users WHERE $field = :id LIMIT 1");
+                $stmt->execute([':id' => $identifier]);
+                $user = $stmt->fetch();
 
-                // Supprimer anciens tokens de ce user
-                $pdo->prepare("DELETE FROM password_resets WHERE user_id = :uid")->execute([':uid' => $user['id']]);
+                if ($user) {
+                    // Générer token
+                    $token = bin2hex(random_bytes(32));
+                    $expires = (new DateTime('+1 hour'))->format('Y-m-d H:i:s');
 
-                // Sauvegarder nouveau
-                $stmt = $pdo->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (:uid, :token, :exp)");
-                $stmt->execute([
-                    ':uid' => $user['id'],
-                    ':token' => $token,
-                    ':exp' => $expires
-                ]);
+                    // Supprimer anciens tokens de ce user
+                    $pdo->prepare("DELETE FROM password_resets WHERE user_id = :uid")->execute([':uid' => $user['id']]);
 
-                // Préparer lien
-                $reset_link = "https://".$_SERVER['HTTP_HOST']."/login/reset.php?token=".$token;
+                    // Sauvegarder nouveau
+                    $stmt = $pdo->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (:uid, :token, :exp)");
+                    $stmt->execute([
+                        ':uid' => $user['id'],
+                        ':token' => $token,
+                        ':exp' => $expires
+                    ]);
 
-                // Envoi de l'e-mail
-                $to = $user['email'];
-                $subject = "Réinitialisation de votre mot de passe - Kelasi";
-                $message = "Bonjour,\n\n";
-                $message .= "Vous avez demandé la réinitialisation de votre mot de passe sur Kelasi.\n";
-                $message .= "Veuillez cliquer sur le lien ci-dessous pour choisir un nouveau mot de passe :\n";
-                $message .= $reset_link . "\n\n";
-                $message .= "Ce lien est valable pendant 1 heure.\n";
-                $message .= "Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.\n\n";
-                $message .= "L'équipe Kelasi";
+                    // Préparer lien
+                    $reset_link = "https://".$_SERVER['HTTP_HOST']."/login/reset.php?token=".$token;
 
-                $headers = "From: Kelasi <no-reply@kelasi.education>\r\n";
-                $headers .= "Reply-To: support@kelasi.education\r\n";
-                $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+                    // Envoi de l'e-mail
+                    $to = $user['email'];
+                    $subject = "Réinitialisation de votre mot de passe - Kelasi";
+                    $message = "Bonjour,\n\n";
+                    $message .= "Vous avez demandé la réinitialisation de votre mot de passe sur Kelasi.\n";
+                    $message .= "Veuillez cliquer sur le lien ci-dessous pour choisir un nouveau mot de passe :\n";
+                    $message .= $reset_link . "\n\n";
+                    $message .= "Ce lien est valable pendant 1 heure.\n";
+                    $message .= "Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.\n\n";
+                    $message .= "L'équipe Kelasi";
 
-                if (mail($to, $subject, $message, $headers)) {
-                    $success = "Un e-mail de réinitialisation a été envoyé à votre adresse.";
+                    $headers = "From: Kelasi <no-reply@kelasi.education>\r\n";
+                    $headers .= "Reply-To: support@kelasi.education\r\n";
+                    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+
+                    if (mail($to, $subject, $message, $headers)) {
+                        $success = "Un e-mail de réinitialisation a été envoyé à votre adresse.";
+                    } else {
+                        $errors[] = "Erreur lors de l'envoi de l'e-mail. Veuillez contacter l'administrateur.";
+                    }
                 } else {
-                    $errors[] = "Erreur lors de l'envoi de l'e-mail. Veuillez contacter l'administrateur.";
+                    $errors[] = "Aucun compte trouvé pour cet identifiant.";
                 }
-            } else {
-                $errors[] = "Aucun compte trouvé pour cet identifiant.";
+            } catch (Throwable $e) {
+                error_log("Forgot error: ".$e->getMessage());
+                $errors[] = "Erreur lors de la demande. Veuillez réessayer.";
             }
-        } catch (Throwable $e) {
-            error_log("Forgot error: ".$e->getMessage());
-            $errors[] = "Erreur lors de la demande. Veuillez réessayer.";
         }
     }
 }
@@ -136,6 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php endif; ?>
 
                 <form method="post" action="forgot.php" class="login-form">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                     <div class="form-group">
                         <label for="identifier">E-mail ou Nom d'utilisateur</label>
                         <input type="text" id="identifier" name="identifier" class="form-control"
