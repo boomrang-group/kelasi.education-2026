@@ -104,7 +104,7 @@ try {
     $st=$pdo->prepare($sql);
     $st->execute($p);
     $content = $st->fetch(PDO::FETCH_ASSOC);
-    if (!$content) { bad('Contenu introuvable.'); }
+    // if (!$content) { bad('Contenu introuvable.'); }
     // if ((int)$content['class'] !== $class_id) { bad('Accès refusé (contenu/classe).'); }
 } catch(Throwable $e){ bad('Erreur contenu.'); }
 
