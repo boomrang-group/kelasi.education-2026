@@ -128,35 +128,41 @@ if ($leconIds) {
 
     $pdfById = $imgById = $vidById = $audById = [];
 
+    // Performance optimization: Deduplicate content IDs per media type prior to executing batch IN (...) queries
+    // to prevent sending duplicate bound parameters to MySQL.
     if ($idsByType['pdf']) {
-        $in = implode(',', array_fill(0, count($idsByType['pdf']), '?'));
+        $pdfIds = array_values(array_unique($idsByType['pdf']));
+        $in = implode(',', array_fill(0, count($pdfIds), '?'));
         try {
             $st = $pdo->prepare("SELECT id, title, filename, description, uploaded_at FROM pdfs WHERE id IN ($in)");
-            $st->execute($idsByType['pdf']);
+            $st->execute($pdfIds);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) $pdfById[(int)$row['id']] = $row;
         } catch (Throwable $e) {}
     }
     if ($idsByType['image']) {
-        $in = implode(',', array_fill(0, count($idsByType['image']), '?'));
+        $imgIds = array_values(array_unique($idsByType['image']));
+        $in = implode(',', array_fill(0, count($imgIds), '?'));
         try {
             $st = $pdo->prepare("SELECT id, title, filename, description, uploaded_at FROM images WHERE id IN ($in)");
-            $st->execute($idsByType['image']);
+            $st->execute($imgIds);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) $imgById[(int)$row['id']] = $row;
         } catch (Throwable $e) {}
     }
     if ($idsByType['video']) {
-        $in = implode(',', array_fill(0, count($idsByType['video']), '?'));
+        $vidIds = array_values(array_unique($idsByType['video']));
+        $in = implode(',', array_fill(0, count($vidIds), '?'));
         try {
             $st = $pdo->prepare("SELECT id, title, filename, description, uploaded_at FROM videos WHERE id IN ($in)");
-            $st->execute($idsByType['video']);
+            $st->execute($vidIds);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) $vidById[(int)$row['id']] = $row;
         } catch (Throwable $e) {}
     }
     if ($idsByType['audio']) {
-        $in = implode(',', array_fill(0, count($idsByType['audio']), '?'));
+        $audIds = array_values(array_unique($idsByType['audio']));
+        $in = implode(',', array_fill(0, count($audIds), '?'));
         try {
             $st = $pdo->prepare("SELECT id, titre AS title, fichier AS filename, description, uploaded_at FROM audios WHERE id IN ($in)");
-            $st->execute($idsByType['audio']);
+            $st->execute($audIds);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) $audById[(int)$row['id']] = $row;
         } catch (Throwable $e) {}
     }
