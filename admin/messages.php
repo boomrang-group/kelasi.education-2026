@@ -61,22 +61,71 @@ function resolveSelfIdentity(PDO $pdo, string $role, int $userId, string $codeEc
   throw new RuntimeException("Rôle non supporté.");
 }
 
-/** Libellé lisible de l’expéditeur */
-function labelFromSender(PDO $pdo, array $msg): string {
-  switch($msg['sender_type']){
-    case 'admin': return 'Administration';
-    case 'prof':
-      $st=$pdo->prepare("SELECT u.first_name,u.last_name FROM class_subject_teacher c JOIN users u ON u.id=c.teacher_user_id WHERE c.id=:id LIMIT 1");
-      $st->execute([':id'=>$msg['sender_id']]);
-      if($r=$st->fetch()){ $n=trim(($r['first_name']??'').' '.($r['last_name']??'')); return $n?:'Professeur'; }
-      return 'Professeur';
-    case 'eleve':
-      $st=$pdo->prepare("SELECT first_name,last_name FROM students WHERE id=:id LIMIT 1");
-      $st->execute([':id'=>$msg['sender_id']]);
-      if($r=$st->fetch()){ $n=trim(($r['first_name']??'').' '.($r['last_name']??'')); return $n?:'Élève'; }
-      return 'Élève';
+/** Batch resolve sender labels to prevent N+1 queries when fetching message lists */
+function batchResolveSenderLabels(PDO $pdo, array &$rows): void {
+  static $cacheProf = [];
+  static $cacheEleve = [];
+
+  $profIdsToFetch = [];
+  $eleveIdsToFetch = [];
+
+  foreach ($rows as $r) {
+    $type = $r['sender_type'] ?? '';
+    $sid  = (string)($r['sender_id'] ?? '');
+    if ($type === 'prof' && !isset($cacheProf[$sid])) {
+      $profIdsToFetch[$sid] = $sid;
+    } elseif ($type === 'eleve' && !isset($cacheEleve[$sid])) {
+      $eleveIdsToFetch[$sid] = $sid;
+    }
   }
-  return 'Inconnu';
+
+  if (!empty($profIdsToFetch)) {
+    $placeholders = implode(',', array_fill(0, count($profIdsToFetch), '?'));
+    $st = $pdo->prepare("SELECT c.id AS cst_id, u.first_name, u.last_name FROM class_subject_teacher c JOIN users u ON u.id=c.teacher_user_id WHERE c.id IN ($placeholders)");
+    $st->execute(array_values($profIdsToFetch));
+    while ($row = $st->fetch()) {
+      $n = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
+      $cacheProf[(string)$row['cst_id']] = $n ?: 'Professeur';
+    }
+    foreach ($profIdsToFetch as $pid) {
+      if (!isset($cacheProf[$pid])) { $cacheProf[$pid] = 'Professeur'; }
+    }
+  }
+
+  if (!empty($eleveIdsToFetch)) {
+    $placeholders = implode(',', array_fill(0, count($eleveIdsToFetch), '?'));
+    $st = $pdo->prepare("SELECT id, first_name, last_name FROM students WHERE id IN ($placeholders)");
+    $st->execute(array_values($eleveIdsToFetch));
+    while ($row = $st->fetch()) {
+      $n = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
+      $cacheEleve[(string)$row['id']] = $n ?: 'Élève';
+    }
+    foreach ($eleveIdsToFetch as $eid) {
+      if (!isset($cacheEleve[$eid])) { $cacheEleve[$eid] = 'Élève'; }
+    }
+  }
+
+  foreach ($rows as &$r) {
+    $type = $r['sender_type'] ?? '';
+    $sid  = (string)($r['sender_id'] ?? '');
+    if ($type === 'admin') {
+      $r['sender_label'] = 'Administration';
+    } elseif ($type === 'prof') {
+      $r['sender_label'] = $cacheProf[$sid] ?? 'Professeur';
+    } elseif ($type === 'eleve') {
+      $r['sender_label'] = $cacheEleve[$sid] ?? 'Élève';
+    } else {
+      $r['sender_label'] = 'Inconnu';
+    }
+  }
+  unset($r);
+}
+
+/** Libellé lisible de l’expéditeur (fallback mono-message avec cache) */
+function labelFromSender(PDO $pdo, array $msg): string {
+  $dummy = [$msg];
+  batchResolveSenderLabels($pdo, $dummy);
+  return $dummy[0]['sender_label'] ?? 'Inconnu';
 }
 
 /**
@@ -152,8 +201,9 @@ if (isset($_GET['api'])) {
             FROM messages m WHERE $where ORDER BY m.created_at ASC, m.id ASC LIMIT 500";
       $st=$pdo->prepare($sql); $st->execute($bind);
       $rows=$st->fetchAll();
+      // Batch resolve all sender labels in O(1) queries to eliminate N+1 overhead
+      batchResolveSenderLabels($pdo, $rows);
       foreach($rows as &$r){
-        $r['sender_label']=labelFromSender($pdo,$r);
         $r['mine']=($r['sender_type']===$me['sender_type'] && (string)$r['sender_id']===(string)$me['sender_id']);
         $r['created_at_iso']=(new DateTime($r['created_at']))->format(DateTime::ATOM);
       } unset($r);
