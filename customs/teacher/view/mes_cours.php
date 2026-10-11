@@ -30,56 +30,35 @@ function csrf_check(string $t): bool {
     return isset($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], $t);
 }
 
-/** Récupère TOUTES les classes pour ce prof (robuste) */
+/** Récupère TOUTES les classes pour ce prof (optimisé : 1 seule requête SQL au lieu de 6) */
 function findClassIdsForTeacher(PDO $pdo, ?int $usersId, ?string $sessionUsername, ?string $sessionEmail, ?string $codeEcole): array {
-    $ids = [];
+    $where = [];
+    $params = [];
 
-    if ($usersId && $codeEcole) {
-        $st = $pdo->prepare("SELECT DISTINCT class_id FROM class_subject_teacher WHERE teacher_user_id=:uid AND code_ecole=:ce");
-        $st->execute([':uid'=>$usersId, ':ce'=>$codeEcole]);
-        $ids = array_merge($ids, array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)));
-    }
     if ($usersId) {
-        $st = $pdo->prepare("SELECT DISTINCT class_id FROM class_subject_teacher WHERE teacher_user_id=:uid");
-        $st->execute([':uid'=>$usersId]);
-        $ids = array_merge($ids, array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)));
-    }
-    if ($sessionUsername && $codeEcole) {
-        $st = $pdo->prepare("SELECT DISTINCT class_id FROM class_subject_teacher WHERE username=:un AND code_ecole=:ce");
-        $st->execute([':un'=>$sessionUsername, ':ce'=>$codeEcole]);
-        $ids = array_merge($ids, array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)));
+        $where[] = 'cst.teacher_user_id = :uid';
+        $params[':uid'] = $usersId;
     }
     if ($sessionUsername) {
-        $st = $pdo->prepare("SELECT DISTINCT class_id FROM class_subject_teacher WHERE username=:un");
-        $st->execute([':un'=>$sessionUsername]);
-        // ❌ BUG ICI précédemment: parenthèse fermée au mauvais endroit
-        $ids = array_merge($ids, array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)));
+        $where[] = 'cst.username = :un';
+        $params[':un'] = $sessionUsername;
     }
     if ($sessionEmail) {
-        if ($codeEcole) {
-            $stT = $pdo->prepare("SELECT id FROM teacher WHERE email=:em AND code_ecole=:ce");
-            $stT->execute([':em'=>$sessionEmail, ':ce'=>$codeEcole]);
-            $tids = array_map('intval', $stT->fetchAll(PDO::FETCH_COLUMN));
-            if ($tids) {
-                $in = implode(',', array_fill(0, count($tids), '?'));
-                $params = $tids; $params[] = $codeEcole;
-                $st = $pdo->prepare("SELECT DISTINCT class_id FROM class_subject_teacher WHERE teacher_user_id IN ($in) AND code_ecole=?");
-                $st->execute($params);
-                $ids = array_merge($ids, array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)));
-            }
-        }
-        $stT = $pdo->prepare("SELECT id FROM teacher WHERE email=:em");
-        $stT->execute([':em'=>$sessionEmail]);
-        $tids = array_map('intval', $stT->fetchAll(PDO::FETCH_COLUMN));
-        if ($tids) {
-            $in = implode(',', array_fill(0, count($tids), '?'));
-            $st = $pdo->prepare("SELECT DISTINCT class_id FROM class_subject_teacher WHERE teacher_user_id IN ($in)");
-            $st->execute($tids);
-            $ids = array_merge($ids, array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)));
-        }
+        $where[] = 'cst.teacher_user_id IN (SELECT id FROM teacher WHERE email = :em)';
+        $params[':em'] = $sessionEmail;
     }
-    $ids = array_values(array_unique(array_filter($ids, fn($v)=>$v>0)));
-    return $ids;
+
+    if (empty($where)) {
+        return [];
+    }
+
+    // Optimization: Combines previous 6 roundtrip DB queries into a single unified query
+    $sql = "SELECT DISTINCT cst.class_id FROM class_subject_teacher cst WHERE (" . implode(' OR ', $where) . ")";
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+
+    $ids = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+    return array_values(array_unique(array_filter($ids, fn($v) => $v > 0)));
 }
 
 function loadClasseInfos(PDO $pdo, array $classIds): array {
