@@ -51,9 +51,8 @@ try {
 } catch (PDOException $e) {
     // Log the error or display a user-friendly message
     error_log("Database Connection Error: " . $e->getMessage());
-    // For a production environment, you might want to display a generic error message
-    // and log the detailed error.
-    die("Database connection failed. Please try again later or contact support. Details: " . $e->getMessage());
+    // For a production environment, display a generic error message and log detailed error.
+    die("Database connection failed. Please try again later or contact support.");
 }
 
 ?>
