@@ -128,44 +128,21 @@ try {
         0
     );
 
-    // 5a) Inscription
-    $somme_inscription = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(p.montant_paye), 0)
-           FROM paiement p
-           JOIN ecoles  e ON e.code_ecole = p.code_ecole
-          WHERE e.id_promoteur = :id
-            AND p.statut = 'Inscription'",
-        [':id' => $PROMO_ID],
-        0.0
-    );
-
-    // 5b) Minerval
-    $somme_minerval = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(p.montant_paye), 0)
-           FROM paiement p
-           JOIN ecoles  e ON e.code_ecole = p.code_ecole
-          WHERE e.id_promoteur = :id
-            AND p.statut = 'Minerval'",
-        [':id' => $PROMO_ID],
-        0.0
-    );
-
-    // 5c) Autres frais
-    $somme_autres = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(p.montant_paye), 0)
-           FROM paiement p
-           JOIN ecoles  e ON e.code_ecole = p.code_ecole
-          WHERE e.id_promoteur = :id
-            AND (
-                  p.statut = 'Autre'
-               OR (p.statut IS NOT NULL AND p.statut <> '' AND p.statut NOT IN ('Inscription','Minerval'))
-            )",
-        [':id' => $PROMO_ID],
-        0.0
-    );
+    // 5) Finances — Consolidate payment sums (Inscription, Minerval, Autres) into a single query using conditional aggregation.
+    // Performance Optimization: Reduces database roundtrips from 3 to 1 and performs a single table scan on `paiement`.
+    $financesSql = "
+      SELECT
+        COALESCE(SUM(CASE WHEN p.statut = 'Inscription' THEN p.montant_paye ELSE 0 END), 0) AS s_ins,
+        COALESCE(SUM(CASE WHEN p.statut = 'Minerval' THEN p.montant_paye ELSE 0 END), 0) AS s_min,
+        COALESCE(SUM(CASE WHEN (p.statut = 'Autre' OR (p.statut IS NOT NULL AND p.statut <> '' AND p.statut NOT IN ('Inscription','Minerval'))) THEN p.montant_paye ELSE 0 END), 0) AS s_aut
+      FROM paiement p
+      JOIN ecoles e ON e.code_ecole = p.code_ecole
+      WHERE e.id_promoteur = :id
+    ";
+    $financesRow = fetch_all($pdo, $financesSql, [':id' => $PROMO_ID])[0] ?? [];
+    $somme_inscription = (float) ($financesRow['s_ins'] ?? 0.0);
+    $somme_minerval    = (float) ($financesRow['s_min'] ?? 0.0);
+    $somme_autres      = (float) ($financesRow['s_aut'] ?? 0.0);
 
     // 5d) Total cohérent
     $total_general = $somme_inscription + $somme_minerval + $somme_autres;
