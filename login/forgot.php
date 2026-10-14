@@ -11,10 +11,22 @@ require_once '../database/db_connect.php';
 $errors = [];
 $success = '';
 
+// CSRF Token Generation
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // CSRF Validation
+    if (!isset($_POST['csrf_token']) || !is_string($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        $errors[] = "Jeton CSRF invalide ou expiré.";
+    }
+
     $identifier = trim($_POST['identifier'] ?? '');
 
-    if ($identifier === '') {
+    if (!empty($errors)) {
+        // CSRF validation failed; halt form processing
+    } else if ($identifier === '') {
         $errors[] = "Veuillez entrer votre e-mail ou nom d'utilisateur.";
     } else {
         try {
@@ -136,6 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php endif; ?>
 
                 <form method="post" action="forgot.php" class="login-form">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                     <div class="form-group">
                         <label for="identifier">E-mail ou Nom d'utilisateur</label>
                         <input type="text" id="identifier" name="identifier" class="form-control"
