@@ -49,11 +49,14 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$db_name;charset=utf8mb4", $username, $password, $options);
     // echo "Database connection successful!"; // Optional: for testing connection
 } catch (PDOException $e) {
-    // Log the error or display a user-friendly message
+    // Always log full detailed error internally
     error_log("Database Connection Error: " . $e->getMessage());
-    // For a production environment, you might want to display a generic error message
-    // and log the detailed error.
-    die("Database connection failed. Please try again later or contact support. Details: " . $e->getMessage());
+
+    // Prevent sensitive database error details from leaking in production
+    if (defined('DEBUG') && DEBUG) {
+        die("Database connection failed. Please try again later or contact support. Details: " . $e->getMessage());
+    }
+    die("Database connection failed. Please try again later or contact support.");
 }
 
 ?>
