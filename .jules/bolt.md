@@ -1,0 +1,3 @@
+## 2026-03-31 - Consolidating Payment Aggregate Queries in Dashboard Services
+**Learning:** Multiple dashboard service files (`admin/service/dashboard-admin.php`, `my_school/service/dashboard.service.php`) were issuing 3 distinct SQL `SELECT SUM(...) WHERE statut = ...` queries against the `paiement` table. Replacing multiple queries per status with a single conditional aggregation query (`SUM(CASE WHEN statut = ... THEN montant_paye ELSE 0 END)`) reduces database roundtrips and avoids redundant index/table scans.
+**Action:** When aggregating financial totals grouped by pre-defined categories/statuses across a table, always use single-pass conditional aggregation (`SUM(CASE WHEN ...)` or `SUM(IF(...))`) in a single SQL query.
