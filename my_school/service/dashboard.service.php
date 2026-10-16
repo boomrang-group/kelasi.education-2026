@@ -87,88 +87,39 @@ function fetch_all(PDO $pdo, string $sql, array $params = []): array {
 }
 
 try {
-    // 1) Nombre d’écoles du promoteur
-    $ecoles = (int) fetch_scalar(
-        $pdo,
-        "SELECT COUNT(*) FROM ecoles WHERE id_promoteur = :id",
-        [':id' => $PROMO_ID],
-        0
-    );
+    // ⚡ Performance optimization: Combine 4 KPI count queries into a single SQL query
+    // Reduces database roundtrips from 4 to 1 on promoter dashboard load.
+    $sqlStats = "
+        SELECT
+            (SELECT COUNT(*) FROM ecoles WHERE id_promoteur = :id) AS total_ecoles,
+            (SELECT COUNT(*) FROM students s JOIN ecoles e ON e.code_ecole = s.code_ecole WHERE e.id_promoteur = :id) AS total_eleves,
+            (SELECT COUNT(*) FROM teacher t JOIN ecoles e ON e.code_ecole = t.code_ecole WHERE e.id_promoteur = :id) AS total_profs,
+            (SELECT COUNT(*) FROM classes c JOIN ecoles e ON e.code_ecole = c.code_ecole WHERE e.id_promoteur = :id) AS total_classes
+    ";
+    $stats = fetch_all($pdo, $sqlStats, [':id' => $PROMO_ID])[0] ?? [];
 
-    // 2) Élèves (toutes écoles du promoteur)
-    $eleves = (int) fetch_scalar(
-        $pdo,
-        "SELECT COUNT(*)
-           FROM students s
-           JOIN ecoles e ON e.code_ecole = s.code_ecole
-          WHERE e.id_promoteur = :id",
-        [':id' => $PROMO_ID],
-        0
-    );
+    $ecoles  = (int)($stats['total_ecoles'] ?? 0);
+    $eleves  = (int)($stats['total_eleves'] ?? 0);
+    $profs   = (int)($stats['total_profs'] ?? 0);
+    $classes = (int)($stats['total_classes'] ?? 0);
 
-    // 3) Enseignants
-    $profs = (int) fetch_scalar(
-        $pdo,
-        "SELECT COUNT(*)
-           FROM teacher t
-           JOIN ecoles e ON e.code_ecole = t.code_ecole
-          WHERE e.id_promoteur = :id",
-        [':id' => $PROMO_ID],
-        0
-    );
+    // ⚡ Performance optimization: Combine 3 separate payment SUM queries into 1 query using conditional aggregation
+    // Reduces database roundtrips from 3 to 1 for financial totals.
+    $sqlFinances = "
+        SELECT
+            SUM(CASE WHEN p.statut = 'Inscription' THEN p.montant_paye ELSE 0 END) AS somme_inscription,
+            SUM(CASE WHEN p.statut = 'Minerval' THEN p.montant_paye ELSE 0 END) AS somme_minerval,
+            SUM(CASE WHEN p.statut NOT IN ('Inscription','Minerval') AND p.statut IS NOT NULL AND p.statut <> '' THEN p.montant_paye ELSE 0 END) AS somme_autres
+        FROM paiement p
+        JOIN ecoles e ON e.code_ecole = p.code_ecole
+        WHERE e.id_promoteur = :id
+    ";
+    $finances = fetch_all($pdo, $sqlFinances, [':id' => $PROMO_ID])[0] ?? [];
 
-    // 4) Classes
-    $classes = (int) fetch_scalar(
-        $pdo,
-        "SELECT COUNT(*)
-           FROM classes c
-           JOIN ecoles e ON e.code_ecole = c.code_ecole
-          WHERE e.id_promoteur = :id",
-        [':id' => $PROMO_ID],
-        0
-    );
-
-    // 5a) Inscription
-    $somme_inscription = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(p.montant_paye), 0)
-           FROM paiement p
-           JOIN ecoles  e ON e.code_ecole = p.code_ecole
-          WHERE e.id_promoteur = :id
-            AND p.statut = 'Inscription'",
-        [':id' => $PROMO_ID],
-        0.0
-    );
-
-    // 5b) Minerval
-    $somme_minerval = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(p.montant_paye), 0)
-           FROM paiement p
-           JOIN ecoles  e ON e.code_ecole = p.code_ecole
-          WHERE e.id_promoteur = :id
-            AND p.statut = 'Minerval'",
-        [':id' => $PROMO_ID],
-        0.0
-    );
-
-    // 5c) Autres frais
-    $somme_autres = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(p.montant_paye), 0)
-           FROM paiement p
-           JOIN ecoles  e ON e.code_ecole = p.code_ecole
-          WHERE e.id_promoteur = :id
-            AND (
-                  p.statut = 'Autre'
-               OR (p.statut IS NOT NULL AND p.statut <> '' AND p.statut NOT IN ('Inscription','Minerval'))
-            )",
-        [':id' => $PROMO_ID],
-        0.0
-    );
-
-    // 5d) Total cohérent
-    $total_general = $somme_inscription + $somme_minerval + $somme_autres;
+    $somme_inscription = (float)($finances['somme_inscription'] ?? 0);
+    $somme_minerval    = (float)($finances['somme_minerval'] ?? 0);
+    $somme_autres      = (float)($finances['somme_autres'] ?? 0);
+    $total_general     = $somme_inscription + $somme_minerval + $somme_autres;
 
     // =========================
     //   GRAPHIQUES - ANALYTIQUE
