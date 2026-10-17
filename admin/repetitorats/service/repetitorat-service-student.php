@@ -1,5 +1,5 @@
 <?php
-// mykelasi/admin/all-repetitorat.php
+// mykelasi/admin/../repetitorat_student.php
 declare(strict_types=1);
 
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
@@ -10,7 +10,7 @@ if (empty($_SESSION['user_id']) || !in_array($role, ['admin','administrateur'], 
 
 // --- Connexion DB robuste ---
 $pdo = null;
-foreach ([__DIR__.'/../database/db_connect.php', __DIR__.'/../../database/db_connect.php', __DIR__.'/database/db_connect.php'] as $p) {
+foreach ([__DIR__.'/../../../database/db_connect.php', __DIR__.'/../database/db_connect.php', __DIR__.'/../../database/db_connect.php', __DIR__.'/database/db_connect.php'] as $p) {
     if (file_exists($p)) { require_once $p; break; }
 }
 if (!isset($pdo) || !($pdo instanceof PDO)) {
@@ -40,8 +40,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if ($resId > 0 && in_array($newStatut, ['en_attente', 'confirmee', 'annulee'], true)) {
         $stUp = $pdo->prepare("UPDATE reservations_repetitorat SET statut = :st WHERE id = :id AND code_ecole = :ce");
         $stUp->execute([':st' => $newStatut, ':id' => $resId, ':ce' => $codeEcole]);
-        header('Location: all-repetitorat.php?msg=updated'); exit;
+        header('Location: repetitorat_student.php?msg=updated'); exit;
     }
+}
+
+// --- Traitement de la suppression ---
+if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
+    $id = (int)$_GET['id'];
+    $codeEcole = (string)($_SESSION['code_ecole'] ?? '');
+
+    if ($id > 0) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM reservations_repetitorat WHERE id = :id AND code_ecole = :ce");
+            $stmt->execute([':id' => $id, ':ce' => $codeEcole]);
+        } catch (Throwable $e) {
+            // Gestion silencieuse ou journalisation de l'erreur
+        }
+    }
+    header('Location: ../repetitorat_student.php?msg=deleted'); exit;
 }
 
 // --- Charger les réservations de répétitorat ---

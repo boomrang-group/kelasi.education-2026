@@ -1,20 +1,48 @@
-<link rel="stylesheet" href="../../css/normalize.css">
+<?php
+// --- Base URL dynamique : évite les chemins relatifs ../../, ../, ../../../ ---
+$documentRoot = realpath($_SERVER['DOCUMENT_ROOT'] ?? '');
+$rootCandidates = [dirname(__DIR__, 2), dirname(__DIR__), __DIR__, dirname(__DIR__, 3)];
+$appRoot = null;
+
+foreach ($rootCandidates as $candidate) {
+    if (is_dir($candidate . '/css') && is_dir($candidate . '/img')) {
+        $appRoot = realpath($candidate);
+        break;
+    }
+}
+
+$appBaseUrl = '';
+if ($appRoot && $documentRoot) {
+    $rootPath = str_replace('\\', '/', $appRoot);
+    $docPath = rtrim(str_replace('\\', '/', $documentRoot), '/');
+    if ($rootPath === $docPath) {
+        $appBaseUrl = '';
+    } elseif (strpos($rootPath, $docPath . '/') === 0) {
+        $appBaseUrl = '/' . trim(substr($rootPath, strlen($docPath)), '/');
+    }
+}
+
+$appUrl = static function (string $path) use ($appBaseUrl): string {
+    return rtrim($appBaseUrl, '/') . '/' . ltrim($path, '/');
+};
+?>
+<link rel="stylesheet" href="<?php echo htmlspecialchars($appUrl('css/normalize.css'), ENT_QUOTES, 'UTF-8'); ?>">
 <!-- Main CSS -->
-<link rel="stylesheet" href="../../css/main.css">
+<link rel="stylesheet" href="<?php echo htmlspecialchars($appUrl('css/main.css'), ENT_QUOTES, 'UTF-8'); ?>">
 <!-- Bootstrap CSS -->
-<link rel="stylesheet" href="../../css/bootstrap.min.css">
+<link rel="stylesheet" href="<?php echo htmlspecialchars($appUrl('css/bootstrap.min.css'), ENT_QUOTES, 'UTF-8'); ?>">
 <!-- Fontawesome CSS -->
-<link rel="stylesheet" href="../../css/all.min.css">
+<link rel="stylesheet" href="<?php echo htmlspecialchars($appUrl('css/all.min.css'), ENT_QUOTES, 'UTF-8'); ?>">
 <!-- Flaticon CSS -->
-<link rel="stylesheet" href="../../fonts/flaticon.css">
+<link rel="stylesheet" href="<?php echo htmlspecialchars($appUrl('fonts/flaticon.css'), ENT_QUOTES, 'UTF-8'); ?>">
 <!-- Full Calender CSS -->
-<link rel="stylesheet" href="../../css/fullcalendar.min.css">
+<link rel="stylesheet" href="<?php echo htmlspecialchars($appUrl('css/fullcalendar.min.css'), ENT_QUOTES, 'UTF-8'); ?>">
 <!-- Animate CSS -->
-<link rel="stylesheet" href="../../css/animate.min.css">
+<link rel="stylesheet" href="<?php echo htmlspecialchars($appUrl('css/animate.min.css'), ENT_QUOTES, 'UTF-8'); ?>">
 <!-- Custom CSS -->
-<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="<?php echo htmlspecialchars($appUrl('style.css'), ENT_QUOTES, 'UTF-8'); ?>">
 <!-- Modernize js -->
-<script src="../../js/modernizr-3.6.0.min.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/modernizr-3.6.0.min.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 
 <?php
 // Navbar admin — autonome (aucun require externe), tolérante si variables manquent.
@@ -41,6 +69,7 @@ $db_candidates = [
     __DIR__ . '/../../database/db_connect.php',   // admin/layouts -> ../../database
     __DIR__ . '/../../../database/db_connect.php',
     __DIR__ . '/../database/db_connect.php',
+    __DIR__ . '/database/db_connect.php',
 ];
 foreach ($db_candidates as $cand) {
     if (file_exists($cand)) { require_once $cand; break; }
@@ -92,7 +121,7 @@ $ecoleSlug  = preg_replace('~[^a-z0-9\-]~i', '', (string)$urlEcole);
 $publicLink = $ecoleSlug ? ('https://kelasi.education/@' . $ecoleSlug) : '#';
 
 // Si tu veux VRAIMENT forcer une auth admin ici (sinon on affiche juste "Guest"):
-if (!$userId || !$isAdmin) { header('Location: ../login/index.php'); exit; }
+if (!$userId || !$isAdmin) { header('Location: ' . $appUrl('login/index.php')); exit; }
 
 $fullName = trim(($nomResp ?: '') . ' ' . ($postnomResp ?: ''));
 ?>
@@ -172,7 +201,7 @@ $fullName = trim(($nomResp ?: '') . ' ' . ($postnomResp ?: ''));
     <div class="nav-bar-header-one">
         <div class="header-logo">
             <a href="https://kelasi.education" target="black">
-                <img src="../img/logo.png" alt="logo">
+                <img src="<?php echo htmlspecialchars($appUrl('img/logo.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="logo">
             </a>
         </div>
         <div class="toggle-button sidebar-toggle">
@@ -220,7 +249,8 @@ $fullName = trim(($nomResp ?: '') . ' ' . ($postnomResp ?: ''));
                         <span>Administrateur</span>
                     </div>
                     <div class="admin-img">
-                        <img src="../img/figure/admin.jpg" alt="Admin">
+                        <img src="<?php echo htmlspecialchars($appUrl('img/figure/admin.jpg'), ENT_QUOTES, 'UTF-8'); ?>"
+                            alt="logo admin">
                     </div>
                 </a>
                 <div class="dropdown-menu dropdown-menu-right">
@@ -234,7 +264,8 @@ $fullName = trim(($nomResp ?: '') . ' ' . ($postnomResp ?: ''));
                             <ul class="settings-list">
                                 <li><a href="profil.php"><i class="flaticon-user"></i>Mon profil</a></li>
                                 <li><a href="settings.php"><i class="flaticon-gear-loading"></i>Paramètres</a></li>
-                                <li><a href="../login/logout.php?msg=logout"><i
+                                <li><a
+                                        href="<?php echo htmlspecialchars($appUrl('login/logout.php?msg=logout'), ENT_QUOTES, 'UTF-8'); ?>"><i
                                             class="flaticon-turn-off"></i>Déconnexion</a></li>
                             </ul>
                         </div>
@@ -260,22 +291,22 @@ $fullName = trim(($nomResp ?: '') . ' ' . ($postnomResp ?: ''));
 <!-- jquery-->
 <!--<script src="../../js/jquery-3.3.1.min.js"></script>-->
 <!-- Plugins js -->
-<script src="../../js/plugins.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/plugins.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <!-- Popper js -->
-<script src="../../js/popper.min.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/popper.min.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <!-- Bootstrap js -->
-<script src="../../js/bootstrap.min.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/bootstrap.min.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <!-- Counterup Js -->
-<script src="../../js/jquery.counterup.min.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/jquery.counterup.min.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <!-- Moment Js -->
-<script src="../../js/moment.min.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/moment.min.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <!-- Waypoints Js -->
-<script src="../../js/jquery.waypoints.min.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/jquery.waypoints.min.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <!-- Scroll Up Js -->
-<script src="../../js/jquery.scrollUp.min.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/jquery.scrollUp.min.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <!-- Full Calender Js -->
-<script src="../../js/fullcalendar.min.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/fullcalendar.min.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <!-- Chart Js -->
-<script src="../../js/Chart.min.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/Chart.min.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 <!-- Custom Js -->
-<script src="../../js/main.js"></script>
+<script src="<?php echo htmlspecialchars($appUrl('js/main.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
