@@ -1,0 +1,3 @@
+## 2025-05-18 - Consolidate Multiple Aggregations on `paiement` Table
+**Learning:** Dashboard service endpoints in MyKelasi (e.g. `admin/service/dashboard-admin.php`) frequently issue multiple sequential `COALESCE(SUM(...))` queries against the `paiement` table for different `statut` values. Consolidating these into a single SQL query using `SUM(CASE WHEN statut = ... THEN montant_paye ELSE 0 END)` eliminates redundant table scans and reduces database roundtrips from 3 to 1.
+**Action:** Look for separate `SUM()` queries filtering on status/category in `service/` scripts and combine them into single conditional aggregation queries.
