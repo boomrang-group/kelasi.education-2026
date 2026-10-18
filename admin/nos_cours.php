@@ -151,79 +151,105 @@ $coursList = $stmtCours->fetchAll(PDO::FETCH_ASSOC);
 
 $fullData = [];
 
-foreach ($coursList as $c) {
-    $coursId = (int)$c['id'];
-    
-    // Récupérer les leçons du cours
-    $stmtL = $pdo->prepare("SELECT * FROM lecons WHERE cours_id = :cours ORDER BY ordre ASC");
-    $stmtL->execute([':cours' => $coursId]);
-    $lecons = $stmtL->fetchAll(PDO::FETCH_ASSOC);
+// Performance Optimization (Bolt):
+// Batch fetch all lecons, lecon_contenus, and media items in bulk using IN (...) queries
+// to avoid N+1 query overhead (reducing queries from 1 + N + M + K to 7 queries max).
+if (!empty($coursList)) {
+    $coursIds = array_map('intval', array_column($coursList, 'id'));
+    $inCours = implode(',', array_fill(0, count($coursIds), '?'));
 
-    $leconsData = [];
+    // 1. Batch fetch all lecons for all courses
+    $stmtL = $pdo->prepare("SELECT * FROM lecons WHERE cours_id IN ($inCours) ORDER BY ordre ASC");
+    $stmtL->execute($coursIds);
+    $allLecons = $stmtL->fetchAll(PDO::FETCH_ASSOC);
 
-    foreach ($lecons as $l) {
-        $leconId = (int)$l['id'];
-        
-        // Récupérer les contenus de la leçon
-        $stmtC = $pdo->prepare("SELECT * FROM lecon_contenus WHERE lecon_id = :lecon ORDER BY ordre ASC");
-        $stmtC->execute([':lecon' => $leconId]);
-        $links = $stmtC->fetchAll(PDO::FETCH_ASSOC);
+    $leconsByCours = [];
+    $leconIds = [];
+    foreach ($allLecons as $l) {
+        $leconsByCours[(int)$l['cours_id']][] = $l;
+        $leconIds[] = (int)$l['id'];
+    }
 
-        $contenus = [];
+    $contenusByLecon = [];
+    if (!empty($leconIds)) {
+        $inLecons = implode(',', array_fill(0, count($leconIds), '?'));
 
-        foreach ($links as $link) {
+        // 2. Batch fetch all lecon_contenus for all lecons
+        $stmtC = $pdo->prepare("SELECT * FROM lecon_contenus WHERE lecon_id IN ($inLecons) ORDER BY ordre ASC");
+        $stmtC->execute($leconIds);
+        $allLinks = $stmtC->fetchAll(PDO::FETCH_ASSOC);
+
+        $mediaIds = ['pdf' => [], 'video' => [], 'audio' => [], 'image' => []];
+        foreach ($allLinks as $link) {
             $type = $link['type_contenu'];
-            $cid  = (int)$link['contenu_id'];
-
-            if ($type === 'pdf') {
-                $s = $pdo->prepare("SELECT id, title, description FROM pdfs WHERE id = :id");
-                $s->execute([':id' => $cid]);
-                if ($row = $s->fetch(PDO::FETCH_ASSOC)) {
-                    $contenus[] = [
-                        'type' => 'PDF', 'icon' => 'fa-file-pdf text-danger',
-                        'title' => $row['title'], 'desc' => $row['description'],
-                        'url' => '../view_pdf.php?id=' . $cid
-                    ];
-                }
-            } elseif ($type === 'video') {
-                $s = $pdo->prepare("SELECT id, title, description FROM videos WHERE id = :id");
-                $s->execute([':id' => $cid]);
-                if ($row = $s->fetch(PDO::FETCH_ASSOC)) {
-                    $contenus[] = [
-                        'type' => 'VIDEO', 'icon' => 'fa-video text-primary',
-                        'title' => $row['title'], 'desc' => $row['description'],
-                        'url' => '../view_video.php?id=' . $cid
-                    ];
-                }
-            } elseif ($type === 'audio') {
-                $s = $pdo->prepare("SELECT id, titre, description FROM audios WHERE id = :id");
-                $s->execute([':id' => $cid]);
-                if ($row = $s->fetch(PDO::FETCH_ASSOC)) {
-                    $contenus[] = [
-                        'type' => 'AUDIO', 'icon' => 'fa-headphones text-success',
-                        'title' => $row['titre'], 'desc' => $row['description'],
-                        'url' => '../view_audio.php?id=' . $cid
-                    ];
-                }
-            } elseif ($type === 'image') {
-                $s = $pdo->prepare("SELECT id, title, description FROM images WHERE id = :id");
-                $s->execute([':id' => $cid]);
-                if ($row = $s->fetch(PDO::FETCH_ASSOC)) {
-                    $contenus[] = [
-                        'type' => 'IMAGE', 'icon' => 'fa-image text-warning',
-                        'title' => $row['title'], 'desc' => $row['description'],
-                        'url' => '../view_image.php?id=' . $cid
-                    ];
-                }
+            $cid = (int)$link['contenu_id'];
+            if (isset($mediaIds[$type])) {
+                $mediaIds[$type][$cid] = $cid;
             }
         }
 
-        $l['contenus'] = $contenus;
-        $leconsData[] = $l;
+        // Helper function for batch loading media details
+        $fetchMedia = function (string $table, string $titleCol, array $ids) use ($pdo): array {
+            if (empty($ids)) {
+                return [];
+            }
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $st = $pdo->prepare("SELECT id, $titleCol AS title, description FROM $table WHERE id IN ($in)");
+            $st->execute(array_values($ids));
+            $map = [];
+            while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+                $map[(int)$row['id']] = $row;
+            }
+            return $map;
+        };
+
+        // 3. Batch fetch media details per type
+        $mediaMaps = [
+            'pdf'   => $fetchMedia('pdfs', 'title', $mediaIds['pdf']),
+            'video' => $fetchMedia('videos', 'title', $mediaIds['video']),
+            'audio' => $fetchMedia('audios', 'titre', $mediaIds['audio']),
+            'image' => $fetchMedia('images', 'title', $mediaIds['image']),
+        ];
+
+        $config = [
+            'pdf'   => ['type' => 'PDF',   'icon' => 'fa-file-pdf text-danger',    'view' => 'view_pdf.php'],
+            'video' => ['type' => 'VIDEO', 'icon' => 'fa-video text-primary',     'view' => 'view_video.php'],
+            'audio' => ['type' => 'AUDIO', 'icon' => 'fa-headphones text-success', 'view' => 'view_audio.php'],
+            'image' => ['type' => 'IMAGE', 'icon' => 'fa-image text-warning',     'view' => 'view_image.php'],
+        ];
+
+        foreach ($allLinks as $link) {
+            $type = $link['type_contenu'];
+            $cid = (int)$link['contenu_id'];
+            $leconId = (int)$link['lecon_id'];
+
+            if (isset($config[$type], $mediaMaps[$type][$cid])) {
+                $row = $mediaMaps[$type][$cid];
+                $cfg = $config[$type];
+                $contenusByLecon[$leconId][] = [
+                    'type'  => $cfg['type'],
+                    'icon'  => $cfg['icon'],
+                    'title' => $row['title'],
+                    'desc'  => $row['description'],
+                    'url'   => '../' . $cfg['view'] . '?id=' . $cid
+                ];
+            }
+        }
     }
 
-    $c['lecons'] = $leconsData;
-    $fullData[] = $c;
+    // Assemble final structured data
+    foreach ($coursList as $c) {
+        $coursId = (int)$c['id'];
+        $lecons = $leconsByCours[$coursId] ?? [];
+        $leconsData = [];
+        foreach ($lecons as $l) {
+            $leconId = (int)$l['id'];
+            $l['contenus'] = $contenusByLecon[$leconId] ?? [];
+            $leconsData[] = $l;
+        }
+        $c['lecons'] = $leconsData;
+        $fullData[] = $c;
+    }
 }
 ?>
 
