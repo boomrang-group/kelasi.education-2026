@@ -31,6 +31,13 @@ function safe_date(?string $s, string $fmt='d/m/Y'){ return $s ? date($fmt, strt
 
 /** WHERE de rattachement prof */
 function buildTeacherWhere(PDO $pdo, ?int $usersId, ?string $sessionUsername, ?string $sessionEmail): array {
+    // ⚡ Bolt Optimization: Static cache to avoid repeating teacher lookup queries in the same request
+    static $cache = [];
+    $cacheKey = ($usersId ?? 0) . '|' . ($sessionUsername ?? '') . '|' . ($sessionEmail ?? '');
+    if (isset($cache[$cacheKey])) {
+        return $cache[$cacheKey];
+    }
+
     $where = []; $params = [];
     $candidateIds = [];
     if ($usersId) $candidateIds[] = (int)$usersId;
@@ -48,7 +55,9 @@ function buildTeacherWhere(PDO $pdo, ?int $usersId, ?string $sessionUsername, ?s
         $where[] = 'cst.teacher_user_id IN ('.implode(',', $in).')';
     }
     if (!empty($sessionUsername)) { $where[]='cst.username=:uname'; $params[':uname']=$sessionUsername; }
-    return [$where,$params];
+
+    $cache[$cacheKey] = [$where,$params];
+    return $cache[$cacheKey];
 }
 
 /** Classes affectées */
@@ -169,21 +178,27 @@ if ($classId) {
         $sts=$pdo->prepare($sqlStu); $sts->execute($pStu);
         $students=$sts->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        // Compteurs basiques (KPIs)
-        $sqlCnt="SELECT COUNT(*) FROM students WHERE class_id=:cid";
-        $pCnt=[':cid'=>$classId];
-        if (!empty($code_ecole)) { $sqlCnt.=" AND code_ecole=:ce"; $pCnt[':ce']=$code_ecole; }
-        $stCnt=$pdo->prepare($sqlCnt); $stCnt->execute($pCnt); $nbEleves=(int)$stCnt->fetchColumn();
-
-        foreach ([['pdfs','uploaded_at','nbPDF'], ['videos','uploaded_at','nbVideo'], ['audios','uploaded_at','nbAudio']] as $def) {
-            [$table,$dateCol,$var] = $def;
-            try {
-                $sql="SELECT COUNT(*) FROM {$table} WHERE class=:cid";
-                $p=[':cid'=>$classId];
-                if (!empty($code_ecole)) { $sql.=" AND code_ecole=:ce"; $p[':ce']=$code_ecole; }
-                $st=$pdo->prepare($sql); $st->execute($p);
-                ${$var}=(int)$st->fetchColumn();
-            } catch(Throwable $e){ ${$var}=0; }
+        // ⚡ Bolt Optimization: Batch media counts across pdfs, videos, audios into a single query using UNION ALL
+        try {
+            $ceWhere = !empty($code_ecole) ? " AND code_ecole=:ce" : "";
+            $sqlMedia = "
+                SELECT 'pdf' AS t, COUNT(*) AS cnt FROM pdfs WHERE class=:cid {$ceWhere}
+                UNION ALL
+                SELECT 'video' AS t, COUNT(*) AS cnt FROM videos WHERE class=:cid {$ceWhere}
+                UNION ALL
+                SELECT 'audio' AS t, COUNT(*) AS cnt FROM audios WHERE class=:cid {$ceWhere}
+            ";
+            $pMedia = [':cid' => $classId];
+            if (!empty($code_ecole)) { $pMedia[':ce'] = $code_ecole; }
+            $stMedia = $pdo->prepare($sqlMedia);
+            $stMedia->execute($pMedia);
+            while ($rMedia = $stMedia->fetch(PDO::FETCH_ASSOC)) {
+                if ($rMedia['t'] === 'pdf') $nbPDF = (int)$rMedia['cnt'];
+                elseif ($rMedia['t'] === 'video') $nbVideo = (int)$rMedia['cnt'];
+                elseif ($rMedia['t'] === 'audio') $nbAudio = (int)$rMedia['cnt'];
+            }
+        } catch (Throwable $e) {
+            $nbPDF = $nbVideo = $nbAudio = 0;
         }
     } catch(Throwable $e){
         $alert = '<div class="alert alert-danger">Erreur de chargement : '.e($e->getMessage()).'</div>';
@@ -199,7 +214,8 @@ $chartContent = [
     'data'   => [ (int)$nbPDF, (int)$nbVideo, (int)$nbAudio ],
 ];
 
-// 2) Sex-ratio élèves
+// 2) Sex-ratio élèves & Nombre total d'élèves
+// ⚡ Bolt Optimization: Compute total student count ($nbEleves) directly from gender aggregation to eliminate duplicate SELECT COUNT(*) query
 $genderData = ['M'=>0,'F'=>0,'Autre'=>0];
 if ($classId) {
     try {
@@ -213,6 +229,7 @@ if ($classId) {
             if (!in_array($g,['M','F'])) $g='AUTRE';
             $genderData[$g]=(int)$r['n'];
         }
+        $nbEleves = array_sum($genderData);
     } catch(Throwable $e){}
 }
 $chartGender = [
