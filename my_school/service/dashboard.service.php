@@ -128,47 +128,23 @@ try {
         0
     );
 
-    // 5a) Inscription
-    $somme_inscription = (float) fetch_scalar(
+    // 5) Finances — ventilation (optimized: single query with conditional aggregation instead of 3 queries)
+    $totalsRow = fetch_all(
         $pdo,
-        "SELECT COALESCE(SUM(p.montant_paye), 0)
+        "SELECT
+            COALESCE(SUM(CASE WHEN p.statut = 'Inscription' THEN p.montant_paye ELSE 0 END), 0) AS s_ins,
+            COALESCE(SUM(CASE WHEN p.statut = 'Minerval' THEN p.montant_paye ELSE 0 END), 0) AS s_min,
+            COALESCE(SUM(CASE WHEN p.statut = 'Autre' OR (p.statut IS NOT NULL AND p.statut <> '' AND p.statut NOT IN ('Inscription', 'Minerval')) THEN p.montant_paye ELSE 0 END), 0) AS s_aut
            FROM paiement p
-           JOIN ecoles  e ON e.code_ecole = p.code_ecole
-          WHERE e.id_promoteur = :id
-            AND p.statut = 'Inscription'",
-        [':id' => $PROMO_ID],
-        0.0
+           JOIN ecoles e ON e.code_ecole = p.code_ecole
+          WHERE e.id_promoteur = :id",
+        [':id' => $PROMO_ID]
     );
 
-    // 5b) Minerval
-    $somme_minerval = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(p.montant_paye), 0)
-           FROM paiement p
-           JOIN ecoles  e ON e.code_ecole = p.code_ecole
-          WHERE e.id_promoteur = :id
-            AND p.statut = 'Minerval'",
-        [':id' => $PROMO_ID],
-        0.0
-    );
-
-    // 5c) Autres frais
-    $somme_autres = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(p.montant_paye), 0)
-           FROM paiement p
-           JOIN ecoles  e ON e.code_ecole = p.code_ecole
-          WHERE e.id_promoteur = :id
-            AND (
-                  p.statut = 'Autre'
-               OR (p.statut IS NOT NULL AND p.statut <> '' AND p.statut NOT IN ('Inscription','Minerval'))
-            )",
-        [':id' => $PROMO_ID],
-        0.0
-    );
-
-    // 5d) Total cohérent
-    $total_general = $somme_inscription + $somme_minerval + $somme_autres;
+    $somme_inscription = isset($totalsRow[0]['s_ins']) ? (float)$totalsRow[0]['s_ins'] : 0.0;
+    $somme_minerval    = isset($totalsRow[0]['s_min']) ? (float)$totalsRow[0]['s_min'] : 0.0;
+    $somme_autres      = isset($totalsRow[0]['s_aut']) ? (float)$totalsRow[0]['s_aut'] : 0.0;
+    $total_general     = $somme_inscription + $somme_minerval + $somme_autres;
 
     // =========================
     //   GRAPHIQUES - ANALYTIQUE
