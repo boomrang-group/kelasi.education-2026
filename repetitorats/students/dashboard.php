@@ -1,173 +1,152 @@
 <?php
+// repetitorats/students/dashboard.php
 declare(strict_types=1);
+require_once __DIR__ . '/services/dashboard-services.php';
 
-ini_set('default_charset', 'UTF-8');
-header('Content-Type: text/html; charset=utf-8');
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-
-// Vérifier que l'utilisateur est connecté
-if (empty($_SESSION['user_id']) || empty($_SESSION['role'])) {
-    header('Location: ../../login/index.php');
-    exit;
-}
-
-// Vérifier le rôle autorisé
-$role = strtolower(trim((string) $_SESSION['role']));
-
-if ($role !== 'eleve_encadre') {
-    header('Location: ../../login/index.php');
-    exit;
-}
-
-// Informations de l'utilisateur connecté
-$userId = (int) $_SESSION['user_id'];
-$username = (string) ($_SESSION['username'] ?? 'Élève encadré');
-$firstName = (string) ($_SESSION['first_name'] ?? '');
-$lastName = (string) ($_SESSION['last_name'] ?? '');
-
-$nomComplet = trim($firstName . ' ' . $lastName);
-
-if ($nomComplet === '') {
-    $nomComplet = $username;
-}
+function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 ?>
-<!DOCTYPE html>
-<html lang="fr">
+<!doctype html>
+<html class="no-js" lang="fr">
 
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>Kelasi | Espace Élève - Tableau de bord</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Espace Élève encadré</title>
+    <link rel="shortcut icon" type="image/x-icon" href="../../img/favicon.png">
+    <link rel="stylesheet" href="../../css/normalize.css">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../../css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../../fonts/flaticon.css">
+    <link rel="stylesheet" href="../../style.css">
+    <script src="../../js/modernizr-3.6.0.min.js"></script>
 
     <style>
-    * {
-        box-sizing: border-box;
+    .dashboard-summery-one .item-number {
+        font-weight: 700;
     }
 
-    body {
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background: #f4f6f9;
-        color: #263238;
-    }
-
-    .navbar {
-        background: #174ea6;
-        color: white;
-        padding: 18px 25px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 15px;
-        flex-wrap: wrap;
-    }
-
-    .navbar h2 {
-        margin: 0;
-        font-size: 20px;
-    }
-
-    .container {
-        max-width: 1100px;
-        margin: 35px auto;
-        padding: 0 20px;
-    }
-
-    .welcome {
-        background: white;
-        padding: 25px;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px #0000000d;
-    }
-
-    .welcome h1 {
-        margin-top: 0;
-        color: #174ea6;
-    }
-
-    .cards {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 20px;
-        margin-top: 25px;
-    }
-
-    .card {
-        background: white;
+    .card-box {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, .06);
         padding: 22px;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px #0000000d;
-    }
-
-    .card h3 {
-        margin-top: 0;
-        color: #174ea6;
-    }
-
-    .logout {
-        background: #dc3545;
-        color: white;
-        padding: 10px 16px;
-        text-decoration: none;
-        border-radius: 5px;
-    }
-
-    .logout:hover {
-        background: #b02a37;
+        margin-bottom: 18px;
     }
     </style>
 </head>
 
 <body>
+    <div id="preloader" class="d-none"></div>
+    <div id="wrapper" class="wrapper bg-ash">
 
-    <header class="navbar">
-        <h2>Espace Élève encadré</h2>
+        <!-- Navbar Élève -->
+        <?php require_once __DIR__ . '/includes/navbar.php'; ?>
 
-        <a class="logout" href="../../login/logout.php">
-            Déconnexion
-        </a>
-    </header>
+        <div class="dashboard-page-one">
+            <!-- Sidebar Élève -->
+            <?php require_once __DIR__ . '/includes/sidebar.php'; ?>
 
-    <main class="container">
+            <div class="dashboard-content-one">
+                <div class="breadcrumbs-area">
+                    <h3 style="text-transform: uppercase;">MON ESPACE D'APPRENTISSAGE</h3>
+                    <p class="muted mb-3">Bienvenue <strong><?= h($nomComplet) ?></strong> | Établissement :
+                        <strong><?= h($nomEcole) ?></strong>
+                    </p>
+                </div>
 
-        <section class="welcome">
-            <h1>Bienvenue, <?= htmlspecialchars($nomComplet, ENT_QUOTES, 'UTF-8') ?> !</h1>
+                <!-- KPIs Élève -->
+                <div class="row gutters-20">
+                    <div class="col-xl-4 col-sm-6 col-12">
+                        <div class="dashboard-summery-one mg-b-20">
+                            <div class="row align-items-center">
+                                <div class="col-6">
+                                    <div class="item-icon bg-light-blue">
+                                        <i class="flaticon-books text-blue"></i>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="item-content">
+                                        <div class="item-title">Cours Disponibles</div>
+                                        <div class="item-number"><span><?= (int)$totalCours ?></span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-            <p>
-                Bienvenue dans votre espace personnel de répétitorat.
-            </p>
+                    <div class="col-xl-4 col-sm-6 col-12">
+                        <div class="dashboard-summery-one mg-b-20">
+                            <div class="row align-items-center">
+                                <div class="col-6">
+                                    <div class="item-icon bg-light-yellow">
+                                        <i class="flaticon-checklist text-orange"></i>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="item-content">
+                                        <div class="item-title">Quiz À Réaliser</div>
+                                        <div class="item-number"><span><?= (int)$totalQuiz ?></span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-            <p>
-                <strong>Nom d'utilisateur :</strong>
-                <?= htmlspecialchars($username, ENT_QUOTES, 'UTF-8') ?>
-            </p>
-        </section>
+                    <div class="col-xl-4 col-sm-6 col-12">
+                        <div class="dashboard-summery-one mg-b-20">
+                            <div class="row align-items-center">
+                                <div class="col-6">
+                                    <div class="item-icon bg-light-green">
+                                        <i class="fas fa-award text-green"></i>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="item-content">
+                                        <div class="item-title">Moyenne Générale</div>
+                                        <div class="item-number">
+                                            <span><?= $moyenneEleve !== null ? $moyenneEleve . ' / 20' : '—' ?></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-        <section class="cards">
+                <!-- Actions Rapides -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card-box">
+                            <h5 class="fw-bold mb-3"><i class="bi bi-journal-bookmark text-primary me-2"></i> Révisions
+                            </h5>
+                            <p class="text-muted">Accédez à l'ensemble de vos cours, leçons et fichiers multimédias mis
+                                à disposition par votre répétiteur.</p>
+                            <a href="mes_cours.php" class="btn btn-primary btn-sm fw-bold"><i
+                                    class="bi bi-arrow-right-circle me-1"></i> Consulter mes cours</a>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card-box">
+                            <h5 class="fw-bold mb-3"><i class="bi bi-pencil-square text-warning me-2"></i> Évaluations
+                            </h5>
+                            <p class="text-muted">Répondez à vos questionnaires (QCM / QR) pour évaluer vos
+                                connaissances et consulter vos notes.</p>
+                            <a href="mes_quiz.php" class="btn btn-warning text-dark btn-sm fw-bold"><i
+                                    class="bi bi-check-circle me-1"></i> Accéder aux quiz</a>
+                        </div>
+                    </div>
+                </div>
 
-            <article class="card">
-                <h3>Mes cours</h3>
-                <p>Consultez vos cours de répétitorat.</p>
-            </article>
+            </div>
+        </div>
+    </div>
 
-            <article class="card">
-                <h3>Mes exercices</h3>
-                <p>Retrouvez vos exercices et travaux.</p>
-            </article>
-
-            <article class="card">
-                <h3>Mon profil</h3>
-                <p>Consultez vos informations personnelles.</p>
-            </article>
-
-        </section>
-
-    </main>
-
+    <script src="../../js/jquery-3.3.1.min.js"></script>
+    <script src="../../js/bootstrap.min.js"></script>
 </body>
 
 </html>

@@ -209,77 +209,73 @@ require_once __DIR__ . '/services/students-services.php';
 
 <body>
 
-    <header class="navbar-top">
-        <a href="dashboard.php" class="brand-box"><i class="fa fa-graduation-cap"></i> Kelasi <span>Education</span></a>
-        <div class="topbar-center">
-            <h6 class="topbar-school-name"><?= htmlspecialchars($nomEcole, ENT_QUOTES, 'UTF-8') ?></h6>
-            <a href="#" class="topbar-school-url"><?= htmlspecialchars($urlEcole, ENT_QUOTES, 'UTF-8') ?></a>
-        </div>
-        <div class="topbar-right">
-            <div>
-                <p class="user-name-title"><?= htmlspecialchars($nomComplet, ENT_QUOTES, 'UTF-8') ?></p>
-                <p class="user-role-title">Répétiteur</p>
-            </div>
-            <div class="user-avatar-circle"><i class="fa fa-user"></i></div>
-        </div>
-    </header>
+    <div id="wrapper" class="wrapper bg-ash">
 
-    <?php require_once __DIR__ . '/includes/sidebar.php'; ?>
+        <!-- Inclusion de la Navbar -->
+        <?php require_once(__DIR__ . '/includes/navbar.php'); ?>
 
-    <main class="main-content">
-        <div class="page-title-box">
-            <h2>MES ÉLÈVES ENCADRÉS</h2>
-            <p>Liste des élèves assignés à votre programme de répétitorat.</p>
-        </div>
+        <div class="dashboard-page-one">
+            <!-- Inclusion de la Sidebar -->
+            <?php require_once(__DIR__ . '/includes/sidebar.php'); ?>
 
-        <div class="card-custom">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Nom & Prénom</th>
-                            <th>Classe</th>
-                            <th>Matières</th>
-                            <th>Mode</th>
-                            <th>Contact Parent</th>
-                            <th>Statut</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($eleves)): foreach ($eleves as $index => $el): ?>
-                        <tr>
-                            <td><?= $index + 1 ?></td>
-                            <td><strong><?= htmlspecialchars($el['nom_eleve'] . ' ' . $el['prenom_eleve'], ENT_QUOTES, 'UTF-8') ?></strong>
-                            </td>
-                            <td><?= htmlspecialchars($el['classe'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><span
-                                    class="badge bg-light text-dark border"><?= htmlspecialchars($el['matieres'], ENT_QUOTES, 'UTF-8') ?></span>
-                            </td>
-                            <td><?= htmlspecialchars(ucfirst($el['mode']), ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars($el['phone_parent'] ?? $el['whatsapp_parent'], ENT_QUOTES, 'UTF-8') ?>
-                            </td>
-                            <td>
-                                <?php if ($el['statut'] === 'confirmee'): ?>
-                                <span class="badge bg-success">Confirmée</span>
-                                <?php elseif ($el['statut'] === 'annulee'): ?>
-                                <span class="badge bg-danger">Annulée</span>
-                                <?php else: ?>
-                                <span class="badge bg-warning text-dark">En attente</span>
+            <div class="dashboard-content-one">
+                <div class="breadcrumbs-area">
+                    <h3 style="text-transform: uppercase;">MES ÉLÈVES ENCADRÉS</h3>
+                    <p>Liste des élèves assignés à votre programme de répétitorat.</p>
+                </div>
+
+                <div class="card-custom">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Nom & Prénom</th>
+                                    <th>Classe</th>
+                                    <th>Matières</th>
+                                    <th>Mode</th>
+                                    <th>Contact Parent</th>
+                                    <th>Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (!empty($eleves)): foreach ($eleves as $index => $el): ?>
+                                <tr>
+                                    <td><?= $index + 1 ?></td>
+                                    <td><strong><?= htmlspecialchars($el['nom_eleve'] . ' ' . $el['prenom_eleve'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                    </td>
+                                    <td><?= htmlspecialchars($el['classe'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td><span
+                                            class="badge bg-light text-dark border"><?= htmlspecialchars($el['matieres'], ENT_QUOTES, 'UTF-8') ?></span>
+                                    </td>
+                                    <td><?= htmlspecialchars(ucfirst($el['mode']), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td><?= htmlspecialchars($el['phone_parent'] ?? $el['whatsapp_parent'], ENT_QUOTES, 'UTF-8') ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($el['statut'] === 'confirmee'): ?>
+                                        <span class="badge bg-success text-white">Confirmée</span>
+                                        <?php elseif ($el['statut'] === 'annulee'): ?>
+                                        <span class="badge bg-danger">Annulée</span>
+                                        <?php else: ?>
+                                        <span class="badge bg-warning text-dark">En attente</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; else: ?>
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">Aucun élève encadré trouvé
+                                        pour le
+                                        moment.</td>
+                                </tr>
                                 <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php endforeach; else: ?>
-                        <tr>
-                            <td colspan="7" class="text-center text-muted py-4">Aucun élève encadré trouvé pour le
-                                moment.</td>
-                        </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
-    </main>
+    </div>
+    </div>
     <script src="../../js/bootstrap.bundle.min.js"></script>
 </body>
 

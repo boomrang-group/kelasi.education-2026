@@ -263,6 +263,7 @@ $fullName = trim(($nomResp ?: '') . ' ' . ($postnomResp ?: ''));
                         <div class="item-content">
                             <ul class="settings-list">
                                 <li><a href="profil.php"><i class="flaticon-user"></i>Mon profil</a></li>
+                                <li><a href="reporting/"><i class="flaticon-gear-loading"></i>Report state</a></li>
                                 <li><a href="settings.php"><i class="flaticon-gear-loading"></i>Paramètres</a></li>
                                 <li><a
                                         href="<?php echo htmlspecialchars($appUrl('login/logout.php?msg=logout'), ENT_QUOTES, 'UTF-8'); ?>"><i

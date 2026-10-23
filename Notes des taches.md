@@ -144,208 +144,6 @@ executer dans data :
 ALTER TABLE users MODIFY COLUMN role ENUM('promoteur','admin','prof','eleve','manager','eleve_encadre') NOT NULL;
 ALTER TABLE `users` CHANGE `role` `role` ENUM('promoteur','admin','prof','eleve','manager','eleve_encadre','repetiteur') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL;
 
-corriger moi le service ici en fonction des ces tables : 
-corrgiger ces codes ; 
-<?php
-// repetitorats/teachers/services/cours-lessons-services.php
-declare(strict_types=1);
-
-ini_set('display_errors', '0');
-ini_set('log_errors', '1');
-error_reporting(E_ALL);
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-
-$role = strtolower(trim((string) ($_SESSION['role'] ?? '')));
-if (empty($_SESSION['user_id']) ||$role !== 'repetiteur') {
-    header('Location: ../../../login/index.php?msg=forbidden');
-    exit;
-}
-
-$pdo = null;
-$dbPaths = [
-    __DIR__ . '/../../../database/db_connect.php',
-    __DIR__ . '/../../database/db_connect.php',
-    __DIR__ . '/../database/db_connect.php',
-];
-
-foreach ($dbPaths as$path) {
-    if (is_file($path)) {
-        require_once $path;
-        break;
-    }
-}
-
-if (!isset($pdo) || !$pdo instanceof PDO) {
-    http_response_code(500);
-    exit('Erreur serveur : base de données indisponible.');
-}
-
-$userId   = (int)$_SESSION['user_id'];
-$username = (string) ($_SESSION['username'] ?? 'Répétiteur');
-$firstName = (string) ($_SESSION['first_name'] ?? '');
-$lastName  = (string) ($_SESSION['last_name'] ?? '');
-$codeEcole = (string) ($_SESSION['code_ecole'] ?? '');
-
-$nomComplet = trim($firstName . ' ' .$lastName);
-if ($nomComplet === '') {
-    $nomComplet =$username;
-}
-
-$nomEcole = (string) ($_SESSION['nom_ecole'] ?? 'Raynée International School');
-$urlEcole = (string) ($_SESSION['url_ecole'] ?? 'kelasi.education/@raynee-international');
-
-$successMsg = '';$errorMsg = '';
-$classesList = [];$mesCours = [];
-
-// Récupérer les classes disponibles pour l'école (obligatoire pour la table `cours`)
-try {
-    $stCl =$pdo->prepare(
-        'SELECT id, classe, description
-         FROM classes
-         WHERE code_ecole = :ce
-         ORDER BY classe ASC'
-    );
-    $stCl->execute([':ce' =>$codeEcole]);
-    $classesList =$stCl->fetchAll(PDO::FETCH_ASSOC);
-} catch (Throwable $e) {
-    error_log('Erreur récupération classes : ' . $e->getMessage());
-}
-
-// Traitement du formulaire de création de cours/leçon
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nomCours = trim((string) ($_POST['nom_cours'] ?? ''));
-    $titreLecon = trim((string) ($_POST['titre_lecon'] ?? ''));
-    $descriptionContenu = trim((string) ($_POST['description_contenu'] ?? ''));
-    $isPublished = isset($_POST['is_published']) ? 1 : 0;
-    
-    // $classId = (int) ($_POST['class_id'] ?? 0);
-
-    $typeContenu = strtolower(trim((string) ($_POST['type_contenu'] ?? 'pdf')));$typesAutorises = ['pdf', 'image', 'audio', 'video'];
-    if (!in_array($typeContenu, $typesAutorises, true)) {$typeContenu = 'pdf';
-    }
-
-    if ($nomCours === '' || $titreLecon === '') {$errorMsg = 'Veuillez remplir le nom du cours, le titre de la leçon et sélectionner une classe.';
-    } else {
-        $fichierDeplace = null;
-
-        try {
-            $pdo->beginTransaction();
-
-            // 1. Vérifier si le cours existe déjà pour cette classe, ce nom et cette école
-            $stCheck = $pdo->prepare( 'SELECT id FROM cours WHERE nom = :nom AND code_ecole = :ce AND teacher_user_id = :uid LIMIT 1' );$stCheck->execute([
-                ':nom' => $nomCours, 
-                ':ce'  => $codeEcole,
-                ':uid' => $userId,
-            ]);
-            $coursId =$stCheck->fetchColumn();
-
-            if (!$coursId) {$stInsCours = $pdo->prepare( 'INSERT INTO cours (nom, teacher_user_id, code_ecole) VALUES (:nom, :uid, :ce)' );$stInsCours->execute([
-                    ':nom' => $nomCours, 
-                    ':uid' => $userId,
-                    ':ce'  => $codeEcole,
-                ]);
-                $coursId = (int)$pdo->lastInsertId();
-            } else {
-                $coursId = (int)$coursId;
-            }
-
-            // 2. Calculer l'ordre de la leçon
-            $stOrdre =$pdo->prepare('SELECT COUNT(*) FROM lecons WHERE cours_id = :cid');
-            $stOrdre->execute([':cid' =>$coursId]);
-            $ordre = (int)$stOrdre->fetchColumn() + 1;
-
-            // 3. Enregistrer la leçon
-            $stInsLecon = $pdo->prepare( 'INSERT INTO lecons (cours_id, titre, ordre, is_published) VALUES (:cid, :titre, :ordre, :pub)' );$stInsLecon->execute([
-                ':cid'   => $coursId,
-                ':titre' => $titreLecon,
-                ':ordre' => $ordre,
-                ':pub'   => $isPublished,
-            ]);
-            $leconId = (int)$pdo->lastInsertId();
-
-            // 4. Téléversement du fichier média (si présent)
-            $contenuTableId = 0;
-            if (isset($_FILES['fichier_media'])
-                && (int) ($_FILES['fichier_media']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-
-                $fileTmp = (string)$_FILES['fichier_media']['tmp_name'];
-                $originalName = basename((string)$_FILES['fichier_media']['name']);
-                $safeName = preg_replace('/[^a-zA-Z0-9_.-]/', '_',$originalName);
-                $fileName = date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '_' . $safeName;
-                $uploadDir = __DIR__ . '/../../../uploads/';
-
-                if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
-                    throw new RuntimeException('Impossible de créer le dossier de téléversement.');
-                }
-
-                $destination = $uploadDir .$fileName;
-                if (!move_uploaded_file($fileTmp,$destination)) {
-                    throw new RuntimeException('Le fichier multimédia n’a pas pu être téléversé.');
-                }
-                $fichierDeplace =$destination;
-
-                // Insertion dans la table spécifique au type de média
-                if ($typeContenu === 'pdf') {
-                    $stMed =$pdo->prepare('INSERT INTO pdfs (title, description, filename, class, code_ecole) VALUES (:t, :d, :f, :cls, :ce)');
-                } elseif ($typeContenu === 'image') {
-                    $stMed =$pdo->prepare('INSERT INTO images (title, description, filename, code_ecole) VALUES (:t, :d, :f, :ce)');
-                } elseif ($typeContenu === 'audio') {
-                    $stMed =$pdo->prepare('INSERT INTO audios (titre, description, fichier, code_ecole) VALUES (:t, :d, :f, :ce)');
-                } else {
-                    $stMed =$pdo->prepare('INSERT INTO videos (title, description, filename, code_ecole) VALUES (:t, :d, :f, :ce)');
-                }
-
-                $stMed->execute([
-                    ':t'   => $titreLecon,
-                    ':d'   => $descriptionContenu,
-                    ':f'   => $fileName, 
-                    ':ce'  => $codeEcole,
-                ]);
-                $contenuTableId = (int)$pdo->lastInsertId();
-            }
-
-            // 5. Lier le média à la leçon si enregistré
-            if ($contenuTableId > 0) {$stLink = $pdo->prepare( 'INSERT INTO lecon_contenus (lecon_id, type_contenu, contenu_id, ordre) VALUES (:lid, :type, :cid, 1)' );$stLink->execute([
-                    ':lid'  => $leconId,
-                    ':type' => $typeContenu,
-                    ':cid'  => $contenuTableId,
-                ]);
-            }
-
-            $pdo->commit();$successMsg = 'Le cours et sa leçon ont été enregistrés avec succès.';
-        } catch (Throwable $e) {
-            if ($pdo->inTransaction()) {$pdo->rollBack();
-            }
-            if ($fichierDeplace !== null && is_file($fichierDeplace)) {
-                @unlink($fichierDeplace);
-            }
-            error_log('Erreur création cours/leçon : ' . $e->getMessage());$errorMsg = 'Erreur lors de l’enregistrement : ' . $e->getMessage();
-        }
-    }
-}
-
-// Récupérer la liste des cours du répétiteur
-try {
-    $stCoursList =$pdo->prepare(
-        'SELECT c.id AS cours_id,
-                c.nom AS cours_nom, 
-                l.id AS lecon_id,
-                l.titre AS lecon_titre,
-                l.is_published,
-                l.created_at
-         FROM cours c 
-         LEFT JOIN lecons l ON l.cours_id = c.id
-         WHERE c.teacher_user_id = :uid
-         ORDER BY c.id DESC, l.ordre ASC'
-    );
-    $stCoursList->execute([':uid' =>$userId]);
-    $mesCours =$stCoursList->fetchAll(PDO::FETCH_ASSOC);
-} catch (Throwable $e) {
-    error_log('Erreur récupération cours : ' . $e->getMessage());
-}
 CREATE TABLE cours_repetitorat (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nom VARCHAR(255) NOT NULL,
@@ -389,3 +187,48 @@ CREATE TABLE lecon_contenus_repetitorat (
         REFERENCES lecons_repetitorat(id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+#20.10.2026
+CREATE TABLE IF NOT EXISTS quiz_repetitorat(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    cours_id INT NOT NULL,
+    teacher_user_id INT NOT NULL,
+    code_ecole VARCHAR(50) NOT NULL,
+    titre VARCHAR(255) NOT NULL,
+    type_quiz ENUM('qcm', 'qr', 'pj') DEFAULT 'qcm',
+    description TEXT NULL,
+    fichier_pj VARCHAR(255) NULL,
+    is_published TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Si elles n'existent pas du tout, voici leur création directe :
+CREATE TABLE IF NOT EXISTS quiz_questions_repetitorat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    quiz_id INT NOT NULL,
+    question_texte TEXT NOT NULL,
+    type_question ENUM('qcm', 'qr') DEFAULT 'qcm',
+    points INT DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS quiz_options_repetitorat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT NOT NULL,
+    option_texte TEXT NOT NULL,
+    est_correcte TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS `quiz_resultats_repetitorat` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `quiz_id` int(11) NOT NULL,
+ `student_id` int(11) NOT NULL,
+ `note_obtenue` decimal(5,2) NOT NULL DEFAULT 0.00,
+ `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
+ PRIMARY KEY (`id`),
+ KEY `idx_qrr_quiz` (`quiz_id`),
+ KEY `idx_qrr_student` (`student_id`),
+ CONSTRAINT `fk_qrr_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quiz_repetitorat` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+ CONSTRAINT `fk_qrr_student` FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
