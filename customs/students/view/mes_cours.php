@@ -22,9 +22,6 @@ const PASS_MIN_PCT      = 0.50;  // 50%
 header('Content-Type: text/html; charset=utf-8');
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-//  $DEBUG = DEBUG; // DEBUG handled in db_connect.php
-// if ($DEBUG) {  // display_errors handled in db_connect.php  // display_startup_errors handled in db_connect.php  // error_reporting handled in db_connect.php }
-
 require_once '../../../database/db_connect.php';
 if (isset($pdo) && $pdo instanceof PDO) { try { $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, true); } catch(Throwable $e){} }
 
@@ -54,7 +51,7 @@ function findStudent(PDO $pdo, ?string $email, ?string $username, ?string $codeE
     return null;
 }
 
-// --- Charger Cours + Leçons (triées)
+// --- Charger Cours + Leçons publiées uniquement (is_published = 1)
 function getCoursesAndLessons(PDO $pdo, int $classId, ?string $codeEcole): array {
     $out=[];
     try{
@@ -66,7 +63,8 @@ function getCoursesAndLessons(PDO $pdo, int $classId, ?string $codeEcole): array
         $courses=$stC->fetchAll(PDO::FETCH_ASSOC);
 
         foreach($courses as $c){
-            $sqlL="SELECT id, titre, ordre FROM lecons WHERE cours_id=:cid ORDER BY ordre, id";
+            // FILTRE AJOUTÉ : IS_PUBLISHED = 1
+            $sqlL="SELECT id, titre, ordre FROM lecons WHERE cours_id=:cid AND is_published=1 ORDER BY ordre, id";
             $stL=$pdo->prepare($sqlL);
             $stL->execute([':cid'=>$c['id']]);
             $less=$stL->fetchAll(PDO::FETCH_ASSOC);
@@ -105,7 +103,7 @@ function findPublishedLessonQuiz(PDO $pdo, int $classId, ?string $codeEcole, str
                  AND is_published=1 AND description LIKE :d
                ORDER BY created_at DESC, id DESC LIMIT 1";
         $st2=$pdo->prepare($sql2);
-        $p2=[':cid'=>$classId, ':d'=>$prefix.'%']; if($codeEole??false){/*typo guard*/} if($codeEcole) $p2[':ce']=$codeEcole;
+        $p2=[':cid'=>$classId, ':d'=>$prefix.'%']; if($codeEcole) $p2[':ce']=$codeEcole;
         $st2->execute($p2);
         if ($q=$st2->fetch(PDO::FETCH_ASSOC)) return $q;
 
@@ -115,7 +113,6 @@ function findPublishedLessonQuiz(PDO $pdo, int $classId, ?string $codeEcole, str
 
 // --- L'élève a-t-il "passé" le quiz ?
 function studentPassedQuiz(PDO $pdo, int $quizId, int $studentId, int $overall): array {
-    // return ['has_submission'=>bool,'passed'=>bool,'score'=>int|null]
     $res=['has_submission'=>false,'passed'=>false,'score'=>null];
     try{
         $st=$pdo->prepare("SELECT STATUS, score_obtained FROM quiz_submissions WHERE quiz_id=:qid AND student_id=:sid ORDER BY submitted_at DESC, id DESC LIMIT 1");
@@ -173,7 +170,6 @@ if(!$student){
         }
         unset($L);
         // Calcul du verrouillage séquentiel (par leçon)
-        // Leçon 1 => unlocked.
         for($i=0;$i<count($lessons);$i++){
             if ($i===0){
                 $lessons[$i]['locked']=false;
@@ -186,10 +182,8 @@ if(!$student){
                 $lessons[$i]['lock_reason']= $lessons[$i]['locked']
                     ? 'Quiz de la leçon précédente non passé'
                     : null;
-                // stocker quiz précédent pour bouton
                 $lessons[$i]['prev_quiz_id']=$prev['quiz']['id'];
             }else{
-                // pas de quiz sur n-1 => déverrouillée
                 $lessons[$i]['locked']=false;
                 $lessons[$i]['lock_reason']=null;
                 $lessons[$i]['prev_quiz_id']=null;
@@ -218,8 +212,7 @@ require_once __DIR__ . '/../layout/check_payment.php';
     <link rel="stylesheet" href="../../../css/animate.min.css">
     <link rel="stylesheet" href="../../../css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="../../../style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-        crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
     <script src="../../../js/modernizr-3.6.0.min.js"></script>
     <style>
     .course-card {
@@ -310,7 +303,7 @@ require_once __DIR__ . '/../layout/check_payment.php';
                     </div>
                     <div class="card-body">
                         <?php if (!$course['lessons']): ?>
-                        <div class="muted">Aucune leçon pour ce cours.</div>
+                        <div class="muted">Aucune leçon publiée pour ce cours.</div>
                         <?php else: ?>
                         <?php foreach ($course['lessons'] as $idx=>$L): 
                                     $locked = !empty($L['locked']);
@@ -385,7 +378,6 @@ require_once __DIR__ . '/../layout/check_payment.php';
     <script src="../../../js/main.js"></script>
     <script>
     (function() {
-        // Recherche rapide côté client
         var input = document.getElementById('search');
         if (!input) return;
         input.addEventListener('input', function() {

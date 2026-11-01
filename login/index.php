@@ -68,7 +68,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $login_identifier = trim((string)($_POST['login_identifier'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
 
-    if ($login_identifier === '') $errors[] = "Nom d'utilisateur ou e-mail est requis.";
+    if ($login_identifier === '') $errors[] = "Nom d'utilisateur est requis.";
     if ($password === '')         $errors[] = "Mot de passe est requis.";
 
     if (!$errors) {
@@ -299,9 +299,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <form action="index.php" method="post" class="login-form" autocomplete="off" novalidate>
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                     <div class="form-group">
-                        <label for="login_identifier">Nom d'utilisateur ou e-mail</label>
+                        <label for="login_identifier">Nom d'utilisateur</label>
                         <input type="text" id="login_identifier" name="login_identifier"
-                            placeholder="Nom d'utilisateur ou e-mail" class="form-control"
+                            placeholder="Mehdou Mbula" class="form-control"
                             value="<?= htmlspecialchars($login_identifier, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>"
                             required autocomplete="username">
                     </div>

@@ -153,35 +153,40 @@ $appUrl = static function (string $path) use ($appBaseUrl): string {
         <ul class="nav nav-sidebar-menu sidebar-toggle-view">
 
             <li class="nav-item">
-                <a href="<?= htmlspecialchars($appUrl('/admin/dashboard.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-link">
+                <a href="<?= htmlspecialchars($appUrl('/admin/dashboard.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    class="nav-link">
                     <i class="icon-sidebar fas fa-tachometer-alt"></i>
                     <span>Tableau de bord</span>
                 </a>
             </li>
 
             <li class="nav-item">
-                <a href="<?= htmlspecialchars($appUrl('/admin/all-class.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-link">
+                <a href="<?= htmlspecialchars($appUrl('/admin/all-class.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    class="nav-link">
                     <i class="icon-sidebar fas fa-school"></i>
                     <span>Classes</span>
                 </a>
             </li>
 
             <li class="nav-item">
-                <a href="<?= htmlspecialchars($appUrl('/admin/all-teacher.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-link">
+                <a href="<?= htmlspecialchars($appUrl('/admin/all-teacher.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    class="nav-link">
                     <i class="icon-sidebar fas fa-chalkboard-teacher"></i>
                     <span>Enseignant</span>
                 </a>
             </li>
 
             <li class="nav-item">
-                <a href="<?= htmlspecialchars($appUrl('/admin/all-students.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-link">
+                <a href="<?= htmlspecialchars($appUrl('/admin/all-students.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    class="nav-link">
                     <i class="icon-sidebar fas fa-user-graduate"></i>
                     <span>Élève</span>
                 </a>
             </li>
 
             <li class="nav-item">
-                <a href="<?= htmlspecialchars($appUrl('/admin/nos_cours.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-link">
+                <a href="<?= htmlspecialchars($appUrl('/admin/nos_cours.php'), ENT_QUOTES, 'UTF-8') ?>"
+                    class="nav-link">
                     <i class="icon-sidebar fas fa-book-open"></i>
                     <span>Nos cours</span>
                 </a>
@@ -195,9 +200,10 @@ $appUrl = static function (string $path) use ($appBaseUrl): string {
             </li>
 
             <li class="nav-item">
-                <a href="<?= htmlspecialchars($appUrl('/admin/profil.php'), ENT_QUOTES, 'UTF-8') ?>" class="nav-link">
-                    <i class="icon-sidebar fas fa-user-circle"></i>
-                    <span>Mon profil</span>
+                <a href="<?= htmlspecialchars($appUrl('/admin/repetitorats/'), ENT_QUOTES, 'UTF-8') ?>"
+                    class="nav-link">
+                    <i class="icon-sidebar fas fa-chalkboard-teacher"></i>
+                    <span>Repetitorat</span>
                 </a>
             </li>
 

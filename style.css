@@ -5086,3 +5086,14 @@ ul {
 .text-orange-red {
   color: #ff0000;
 }
+
+/* badge new  */
+.badge-new {
+    background: red !important;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 10px;
+    text-transform: uppercase;
+}
