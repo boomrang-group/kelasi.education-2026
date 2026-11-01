@@ -19,25 +19,28 @@ if (!$ecole) {
     return;
 }
 
-// Compter les professeurs
-$stmt = $pdo->prepare("SELECT COUNT(*) as nb FROM teacher WHERE code_ecole = :code");
-$stmt->execute(['code' => $ecole['code_ecole']]);
-$nbProfesseurs = $stmt->fetch()['nb'];
+// ⚡ Performance optimization (Bolt): Consolidate 4 separate COUNT queries into 1 query using subqueries.
+// Reduces database round-trips from 4 to 1 on school home page load.
+// Using distinct named parameters (:c1, :c2, :c3, :c4) for compatibility with PDO::ATTR_EMULATE_PREPARES => false.
+$stmtCounts = $pdo->prepare("
+    SELECT
+        (SELECT COUNT(*) FROM teacher WHERE code_ecole = :c1) AS nb_profs,
+        (SELECT COUNT(*) FROM students WHERE code_ecole = :c2) AS nb_eleves,
+        (SELECT COUNT(*) FROM classes WHERE code_ecole = :c3) AS nb_classes,
+        (SELECT COUNT(DISTINCT niveau) FROM classes WHERE code_ecole = :c4) AS nb_cycles
+");
+$stmtCounts->execute([
+    'c1' => $ecole['code_ecole'],
+    'c2' => $ecole['code_ecole'],
+    'c3' => $ecole['code_ecole'],
+    'c4' => $ecole['code_ecole'],
+]);
+$counts = $stmtCounts->fetch(PDO::FETCH_ASSOC) ?: [];
 
-// Compter les élèves
-$stmt = $pdo->prepare("SELECT COUNT(*) as nb FROM students WHERE code_ecole = :code");
-$stmt->execute(['code' => $ecole['code_ecole']]);
-$nbEleves = $stmt->fetch()['nb'];
-
-// Compter les classes
-$stmt = $pdo->prepare("SELECT COUNT(*) as nb FROM classes WHERE code_ecole = :code");
-$stmt->execute(['code' => $ecole['code_ecole']]);
-$nbClasses = $stmt->fetch()['nb'];
-
-// Compter les niveau
-$stmt = $pdo->prepare("SELECT COUNT(DISTINCT niveau) as nb FROM classes WHERE code_ecole = :code");
-$stmt->execute(['code' => $ecole['code_ecole']]);
-$nbCycles = $stmt->fetch()['nb'];
+$nbProfesseurs = (int)($counts['nb_profs'] ?? 0);
+$nbEleves      = (int)($counts['nb_eleves'] ?? 0);
+$nbClasses     = (int)($counts['nb_classes'] ?? 0);
+$nbCycles      = (int)($counts['nb_cycles'] ?? 0);
 
 $stmt = $pdo->prepare("SELECT DISTINCT section FROM classes WHERE code_ecole = :code");
 $stmt->execute(['code' => $ecole['code_ecole']]);
