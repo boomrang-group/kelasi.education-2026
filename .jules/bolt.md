@@ -1,0 +1,3 @@
+## 2026-10-22 - PDO Native Prepared Statement Parameter Binding with Subqueries
+**Learning:** In this codebase, PDO is configured with `PDO::ATTR_EMULATE_PREPARES => false`. Under MySQL native prepared statements, reusing the exact same named parameter (e.g., `:code`) multiple times across subqueries can throw a `HY093: Invalid parameter number` PDOException.
+**Action:** When consolidating multiple subqueries or conditional aggregations into a single prepared statement, always use distinct parameter names (e.g., `:c1`, `:c2`, `:c3`, `:c4`) and map the value to each placeholder in the execute array.
