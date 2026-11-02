@@ -1,0 +1,3 @@
+## 2025-11-02 - Eliminate Nested N+1/N*M Query Loops on Hierarchical Course Data
+**Learning:** In pages displaying relational hierarchies (Courses -> Lessons -> Lesson Contents -> Media like PDFs/Videos/Audios/Images), running queries inside nested loops creates an $O(C \times L \times M)$ query explosion (hundreds of roundtrips on a single page load).
+**Action:** Replace nested query loops with batched `IN (...)` queries and polymorphic `CASE`/`LEFT JOIN`s on the media tables (`pdfs`, `videos`, `audios`, `images`), mapping child items back to parents in memory using dictionary/hash lookups in $O(N)$ time.
