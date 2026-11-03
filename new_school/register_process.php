@@ -1,7 +1,8 @@
 <?php
 // register_process.php
 session_start();
-require_once '../database/db_connect.php'; // doit définir $pdo (PDO)
+require_once __DIR__ . '/../database/db_connect.php'; // doit définir $pdo (PDO)
+require_once __DIR__ . '/../service/security_helpers.php';
 
 $errors = [];
 
@@ -13,7 +14,22 @@ $APP_ACCESS_URL = 'https://kelasi.education/mykelasi/my_school/'; // Lien d’ac
 $APP_LOGIN_URL  = 'https://kelasi.education/mykelasi/my_school/'; // Si tu as une page login distincte, mets-la ici
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-  header('Location: new_school/');
+  header('Location: ../new_school/');
+  exit;
+}
+
+// Security Check (V05): Validate CSRF Token
+if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+  $_SESSION['reg_errors'] = ["Session expirée ou requête invalide (erreur CSRF). Veuillez réessayer."];
+  $_SESSION['reg_old'] = [
+    'first_name'      => filter_var(v('first_name'), FILTER_SANITIZE_FULL_SPECIAL_CHARS),
+    'last_name'       => filter_var(v('last_name'), FILTER_SANITIZE_FULL_SPECIAL_CHARS),
+    'username'        => filter_var(v('username'), FILTER_SANITIZE_FULL_SPECIAL_CHARS),
+    'email'           => filter_var(v('email'), FILTER_SANITIZE_EMAIL),
+    'phone'           => filter_var(v('phone'), FILTER_SANITIZE_FULL_SPECIAL_CHARS),
+    'numero_bancaire' => v('numero_bancaire'),
+  ];
+  header('Location: ../new_school/');
   exit;
 }
 
