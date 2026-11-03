@@ -1,0 +1,3 @@
+## 2026-05-18 - Consolidating Segmented Dashboard Metric Queries
+**Learning:** Dashboard service files (e.g. `admin/service/dashboard-admin.php`) commonly executed multiple independent `SELECT SUM(...)` queries against the same table (`paiement`) filtered by identical scope keys (`code_ecole`) but differing status conditions. Each independent scalar query incurred full network round-trip overhead and re-scanned the table partition.
+**Action:** Consolidate multiple status-filtered aggregate queries on the same table into a single query using conditional aggregation (`SUM(CASE WHEN ... THEN amount ELSE 0 END)`). This eliminates redundant round-trips and reduces table scanning while preserving exact numerical results.
