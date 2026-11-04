@@ -1,0 +1,3 @@
+## 2026-11-04 - Eliminate N+1/N+M Query Cascade in Course Content Hierarchy
+**Learning:** Hierarchical course display screens (`courses` -> `lecons` -> `lecon_contenus` -> `pdfs/videos/audios/images`) can easily degrade into O(C * L * M) database queries when nested loops run queries per row. A school with 15 courses and typical lesson structures was issuing ~466 queries for a single page render.
+**Action:** Always batch fetch child entities using `IN (?, ?, ...)` queries and multi-table polymorphic joins (`LEFT JOIN` across media types with `CASE ... WHEN` selection) to reduce multi-level relational traversals to a constant O(1) number of queries (e.g., 3 queries total), assembling the hierarchy in memory.
