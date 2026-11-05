@@ -9,6 +9,7 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 // if ($DEBUG) {  // display_errors handled in db_connect.php  // display_startup_errors handled in db_connect.php  // error_reporting handled in db_connect.php }
 
 require_once '../../../database/db_connect.php';
+require_once '../../../service/FlexPayIntegration.php';
 if (isset($pdo) && $pdo instanceof PDO) { try { $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, true); } catch(Throwable $e){} }
 
 if (empty($_SESSION['role']) || strtolower($_SESSION['role']) !== 'eleve') {
@@ -180,59 +181,135 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['action']) && $_POST['ac
             exit;
         }
 
-        $ref  = generateReference($pdo);
-        $now  = date('Y-m-d H:i:s');
+        // Intégration FlexPay (Mobile Money & Carte bancaire)
+        if ($mode === 'FlexPay Mobile Money' || $mode === 'FlexPay Carte' || $mode === 'Mobile Money' || $mode === 'Carte') {
+            $ref = generateReference($pdo);
+            $now = date('Y-m-d H:i:s');
+            $devise = 'USD'; // Devise par défaut de facturation
 
-        // Si file d’attente dispo: cash = approved=0, sinon approved=1
-        $approvedValue = 1;
-        if ($hasApproved && strcasecmp($mode, 'Cash') === 0) {
-            $approvedValue = 0;
-        }
+            $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $callbackUrl = "$scheme://$host/customs/students/view/flexpay/callback.php";
 
-        // Nouveau solde côté "approuvé"
-        $newSolde = max(0, $resteLive - ($approvedValue ? $montant : 0));
-
-        try{
+            // Enregistrer la transaction initiale en attente (approved = 0)
             if ($hasMode && $hasApproved) {
-                $st=$pdo->prepare("INSERT INTO paiement
+                $st = $pdo->prepare("INSERT INTO paiement
                     (reference, statut, eleve, montant_paye, mode, approved, solde, date_paiement, code_ecole)
-                    VALUES (:ref,:st,:sid,:montant,:mode,:app,:solde,:dt,:ce)");
-                $st->execute([
-                    ':ref'=>$ref, ':st'=>$type, ':sid'=>$studentId,
-                    ':montant'=>$montant, ':mode'=>$mode, ':app'=>$approvedValue,
-                    ':solde'=>$newSolde, ':dt'=>$now, ':ce'=>$code_ecole
-                ]);
-            } elseif ($hasMode && !$hasApproved) {
-                // Pas de colonne approved -> on enregistre normalement (pas d’attente technique)
-                $st=$pdo->prepare("INSERT INTO paiement
-                    (reference, statut, eleve, montant_paye, mode, solde, date_paiement, code_ecole)
-                    VALUES (:ref,:st,:sid,:montant,:mode,:solde,:dt,:ce)");
+                    VALUES (:ref,:st,:sid,:montant,:mode,0,:solde,:dt,:ce)");
                 $st->execute([
                     ':ref'=>$ref, ':st'=>$type, ':sid'=>$studentId,
                     ':montant'=>$montant, ':mode'=>$mode,
-                    ':solde'=>max(0, $resteLive - $montant), ':dt'=>$now, ':ce'=>$code_ecole
-                ]);
-            } else {
-                // Pas de colonne mode -> fallback historique
-                $st=$pdo->prepare("INSERT INTO paiement
-                    (reference, statut, eleve, montant_paye, solde, date_paiement, code_ecole)
-                    VALUES (:ref,:st,:sid,:montant,:solde,:dt,:ce)");
-                $st->execute([
-                    ':ref'=>$ref, ':st'=>$type, ':sid'=>$studentId,
-                    ':montant'=>$montant, ':solde'=>max(0, $resteLive - $montant), ':dt'=>$now, ':ce'=>$code_ecole
+                    ':solde'=>$resteLive, ':dt'=>$now, ':ce'=>$code_ecole
                 ]);
             }
 
-            if ($hasApproved && strcasecmp($mode, 'Cash') === 0) {
-                // Paiement enregistré mais en attente
-                $alert = '<div class="alert alert-info">Votre paiement <strong>Cash</strong> a été enregistré et est <strong>en attente de validation</strong> par l’administration.</div>';
-            } else {
-                // Approuvé immédiatement
-                header('Location: finances.php?msg=paid');
-                exit;
+            try {
+                $flexPay = new FlexPayIntegration();
+
+                if ($mode === 'FlexPay Carte' || $mode === 'Carte') {
+                    $approveUrl = "$scheme://$host/customs/students/view/finances.php?msg=card_success";
+                    $cancelUrl  = "$scheme://$host/customs/students/view/paiement.php?type=" . urlencode($type);
+                    $declineUrl = "$scheme://$host/customs/students/view/paiement.php?type=" . urlencode($type) . "&msg=declined";
+                    $description = "Paiement frais $type - Élève #$studentId";
+
+                    $res = $flexPay->initiateCardPayment(
+                        (string)$ref,
+                        $montant,
+                        $devise,
+                        $description,
+                        $callbackUrl,
+                        $approveUrl,
+                        $cancelUrl,
+                        $declineUrl
+                    );
+
+                    if ($flexPay->isSuccessCode($res['code'] ?? null) && !empty($res['url'])) {
+                        header("Location: " . $res['url']);
+                        exit;
+                    } else {
+                        $msg = $res['message'] ?? 'Erreur lors de l\'initiation du paiement carte FlexPay';
+                        $alert = '<div class="alert alert-danger">Erreur FlexPay : ' . h($msg) . '</div>';
+                    }
+                } else {
+                    // Mobile Money
+                    $telephone = $_POST['telephone'] ?? '';
+                    $res = $flexPay->initiateMobileMoneyPayment(
+                        (string)$ref,
+                        $montant,
+                        $devise,
+                        $telephone,
+                        $callbackUrl
+                    );
+
+                    if ($flexPay->isSuccessCode($res['code'] ?? null)) {
+                        $orderNum = $res['orderNumber'] ?? '';
+                        $alert = '<div class="alert alert-success">Demande de paiement envoyée sur votre téléphone. Veuillez valider avec votre code PIN. (Commande FlexPay #' . h($orderNum) . ')</div>';
+                    } else {
+                        $msg = $res['message'] ?? 'Erreur lors de la requête Mobile Money FlexPay';
+                        $alert = '<div class="alert alert-danger">Erreur FlexPay : ' . h($msg) . '</div>';
+                    }
+                }
+            } catch (Throwable $e) {
+                $alert = '<div class="alert alert-danger">Exception FlexPay : ' . h($e->getMessage()) . '</div>';
             }
-        }catch(Throwable $e){
-            $alert = '<div class="alert alert-danger">Erreur enregistrement : '.h($e->getMessage()).'</div>';
+        }
+
+        // Traitement Cash ou Autre mode manuel
+        if ($mode !== 'FlexPay Mobile Money' && $mode !== 'FlexPay Carte' && $mode !== 'Mobile Money' && $mode !== 'Carte') {
+            $ref  = generateReference($pdo);
+            $now  = date('Y-m-d H:i:s');
+
+            // Si file d’attente dispo: cash = approved=0, sinon approved=1
+            $approvedValue = 1;
+            if ($hasApproved && strcasecmp($mode, 'Cash') === 0) {
+                $approvedValue = 0;
+            }
+
+            // Nouveau solde côté "approuvé"
+            $newSolde = max(0, $resteLive - ($approvedValue ? $montant : 0));
+
+            try{
+                if ($hasMode && $hasApproved) {
+                    $st=$pdo->prepare("INSERT INTO paiement
+                        (reference, statut, eleve, montant_paye, mode, approved, solde, date_paiement, code_ecole)
+                        VALUES (:ref,:st,:sid,:montant,:mode,:app,:solde,:dt,:ce)");
+                    $st->execute([
+                        ':ref'=>$ref, ':st'=>$type, ':sid'=>$studentId,
+                        ':montant'=>$montant, ':mode'=>$mode, ':app'=>$approvedValue,
+                        ':solde'=>$newSolde, ':dt'=>$now, ':ce'=>$code_ecole
+                    ]);
+                } elseif ($hasMode && !$hasApproved) {
+                    // Pas de colonne approved -> on enregistre normalement (pas d’attente technique)
+                    $st=$pdo->prepare("INSERT INTO paiement
+                        (reference, statut, eleve, montant_paye, mode, solde, date_paiement, code_ecole)
+                        VALUES (:ref,:st,:sid,:montant,:mode,:solde,:dt,:ce)");
+                    $st->execute([
+                        ':ref'=>$ref, ':st'=>$type, ':sid'=>$studentId,
+                        ':montant'=>$montant, ':mode'=>$mode,
+                        ':solde'=>max(0, $resteLive - $montant), ':dt'=>$now, ':ce'=>$code_ecole
+                    ]);
+                } else {
+                    // Pas de colonne mode -> fallback historique
+                    $st=$pdo->prepare("INSERT INTO paiement
+                        (reference, statut, eleve, montant_paye, solde, date_paiement, code_ecole)
+                        VALUES (:ref,:st,:sid,:montant,:solde,:dt,:ce)");
+                    $st->execute([
+                        ':ref'=>$ref, ':st'=>$type, ':sid'=>$studentId,
+                        ':montant'=>$montant, ':solde'=>max(0, $resteLive - $montant), ':dt'=>$now, ':ce'=>$code_ecole
+                    ]);
+                }
+
+                if ($hasApproved && strcasecmp($mode, 'Cash') === 0) {
+                    // Paiement enregistré mais en attente
+                    $alert = '<div class="alert alert-info">Votre paiement <strong>Cash</strong> a été enregistré et est <strong>en attente de validation</strong> par l’administration.</div>';
+                } else {
+                    // Approuvé immédiatement
+                    header('Location: finances.php?msg=paid');
+                    exit;
+                }
+            }catch(Throwable $e){
+                $alert = '<div class="alert alert-danger">Erreur enregistrement : '.h($e->getMessage()).'</div>';
+            }
         }
     }
 }
@@ -379,9 +456,9 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['action']) && $_POST['ac
                                     <div class="form-group">
                                         <label>Mode de paiement</label>
                                         <select name="mode" id="mode_select" class="form-control" required onchange="togglePhoneField()">
-                                            <option value="MaxiCash">MaxiCash (Mobile Money / Cards)</option>
-                                            <option value="Mobile Money">Mobile Money (M-Pesa / Airtel / Orange)</option>
-                                            <option value="Carte">Carte bancaire</option>
+                                            <option value="FlexPay Mobile Money">FlexPay - Mobile Money (M-Pesa, Airtel, Orange)</option>
+                                            <option value="FlexPay Carte">FlexPay - Carte Bancaire (Visa, Mastercard)</option>
+                                            <option value="MaxiCash">MaxiCash</option>
                                             <option value="Cash">Cash (à l’école)</option>
                                             <option value="Autre">Autre</option>
                                         </select>
@@ -418,7 +495,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['action']) && $_POST['ac
         function togglePhoneField() {
             const mode = document.getElementById('mode_select').value;
             const phoneGroup = document.getElementById('phone_group');
-            if (mode === 'MaxiCash' || mode === 'Mobile Money') {
+            if (mode === 'MaxiCash' || mode === 'FlexPay Mobile Money' || mode === 'Mobile Money') {
                 phoneGroup.style.display = 'block';
             } else {
                 phoneGroup.style.display = 'none';
