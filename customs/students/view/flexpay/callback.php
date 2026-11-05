@@ -47,9 +47,19 @@ try {
 
     if (isset($pdo) && $pdo instanceof PDO) {
         if ($isSuccess) {
-            // Transaction validée : marquer le paiement comme approuvé
-            $st = $pdo->prepare("UPDATE paiement SET approved = 1 WHERE reference = :ref");
-            $st->execute([':ref' => $reference]);
+            // Transaction validée : marquer le paiement comme approuvé / validé de manière résiliente
+            try {
+                $st = $pdo->prepare("UPDATE paiement SET is_validated = 1, approved = 1 WHERE reference = :ref");
+                $st->execute([':ref' => $reference]);
+            } catch (Throwable $e) {
+                try {
+                    $st = $pdo->prepare("UPDATE paiement SET is_validated = 1 WHERE reference = :ref");
+                    $st->execute([':ref' => $reference]);
+                } catch (Throwable $e2) {
+                    $st = $pdo->prepare("UPDATE paiement SET approved = 1 WHERE reference = :ref");
+                    $st->execute([':ref' => $reference]);
+                }
+            }
         } else {
             error_log("[FlexPay Webhook] Paiement non approuvé pour référence: $reference (code: $code)");
         }

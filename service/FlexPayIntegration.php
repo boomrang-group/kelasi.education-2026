@@ -16,8 +16,9 @@ class FlexPayIntegration
     public const CARD_PAYMENT_URL  = 'https://cardpayment.flexpay.cd/v1.1/pay';
     public const CHECK_ORDER_URL   = 'https://apicheck.flexpaie.com/api/rest/v1/check/';
 
-    // Valeur marchand par défaut
+    // Paramètres par défaut fournis par le marchand
     private const DEFAULT_MERCHANT = 'BOOMRANGGROUP';
+    private const DEFAULT_TOKEN    = 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiIvbG9naW4iLCJyb2xlcyI6WyJNRVJDSEFOVCJdLCJleHAiOjE4NTEyNjAzMzksInN1YiI6ImIwNGM4MWRlMWEzOGQyMzM5NzZkNGUxMTRiODFmM2FiIn0.WrN9KYb9l-JLABLoJ_yM-TfPg1pK4-szkEMWZ4aIWBs';
 
     /**
      * Constructeur de la classe FlexPayIntegration.
@@ -28,19 +29,38 @@ class FlexPayIntegration
      */
     public function __construct(?string $merchant = null, ?string $token = null, int $timeout = 45)
     {
+        // 1. Détection éventuelle du fichier .env à la racine
+        $envPath = __DIR__ . '/../.env';
+        if (file_exists($envPath) && (!getenv('FLEXPAY_TOKEN') || !getenv('FLEXPAY_MERCHANT'))) {
+            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                $trimmedLine = trim($line);
+                if (strpos($trimmedLine, '#') === 0 || strpos($trimmedLine, '=') === false) continue;
+                list($envKey, $envVal) = explode('=', $trimmedLine, 2);
+                $envKey = trim($envKey);
+                $envVal = trim($envVal, " \t\n\r\0\x0B\"'");
+                if ($envKey === 'FLEXPAY_TOKEN' && !getenv('FLEXPAY_TOKEN')) {
+                    putenv("FLEXPAY_TOKEN=$envVal");
+                }
+                if ($envKey === 'FLEXPAY_MERCHANT' && !getenv('FLEXPAY_MERCHANT')) {
+                    putenv("FLEXPAY_MERCHANT=$envVal");
+                }
+            }
+        }
+
         $this->merchant = $merchant
             ?: (getenv('FLEXPAY_MERCHANT') ?: self::DEFAULT_MERCHANT);
 
-        $rawToken = $token ?: getenv('FLEXPAY_TOKEN');
+        $rawToken = $token
+            ?: (getenv('FLEXPAY_TOKEN') ?: self::DEFAULT_TOKEN);
 
-        if (empty($rawToken)) {
-            // Token par défaut si non spécifié (peut être défini via constructeur ou variables d'environnement)
-            $rawToken = '';
+        $trimmed = trim((string)$rawToken);
+        if ($trimmed === '') {
+            throw new InvalidArgumentException("Token d'accès FlexPay absent ou non défini.");
         }
 
-        // Assurer le préfixe Bearer si token non vide
-        $trimmed = trim((string)$rawToken);
-        if ($trimmed !== '' && !preg_match('/^Bearer\s+/i', $trimmed)) {
+        // Assurer le préfixe Bearer
+        if (!preg_match('/^Bearer\s+/i', $trimmed)) {
             $this->token = 'Bearer ' . $trimmed;
         } else {
             $this->token = $trimmed;
