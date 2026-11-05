@@ -270,14 +270,74 @@ try {
                                     onclick="closeModal('modalChoixPaiement')"><span>&times;</span></button>
                             </div>
                             <div class="modal-body">
+                                <div class="pay-method mb-3" onclick="choisirFlexPay()">
+                                    ⚡ <strong>FlexPay (Mobile Money & Carte)</strong>
+                                    <div class="small muted">M-Pesa, Airtel Money, Orange Money, Visa, Mastercard</div>
+                                </div>
                                 <div class="pay-method mb-3" onclick="choisirCash()">
                                     💵 <strong>Paiement Cash</strong>
-                                    <div class="small muted">À la caisse</div>
+                                    <div class="small muted">À la caisse de l'établissement</div>
                                 </div>
                                 <div class="pay-method" onclick="choisirOnline()">
-                                    🌐 <strong>Paiement en ligne</strong>
-                                    <div class="small muted">MaxiCash</div>
+                                    🌐 <strong>MaxiCash</strong>
+                                    <div class="small muted">MaxiCash en ligne</div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MODAL FLEXPAY -->
+                <div class="modal fade" id="modalFlexPay" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-light">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-bolt text-warning mr-2"></i>
+                                    Paiement FlexPay
+                                </h5>
+                                <button type="button" class="close" onclick="closeModal('modalFlexPay')">
+                                    <span>&times;</span>
+                                </button>
+                            </div>
+
+                            <div class="modal-body">
+                                <div id="flexpayAlert"></div>
+                                <form id="formFlexPay" onsubmit="soumettreFlexPay(event)">
+                                    <div class="form-group mb-3">
+                                        <label class="small muted mb-1">Type de frais</label>
+                                        <input type="text" id="flexpayType" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="form-group mb-3">
+                                        <label class="small muted mb-1">Montant à payer (USD)</label>
+                                        <div class="input-group">
+                                            <input type="number" step="0.01" min="1" id="flexpayAmount" class="form-control" required>
+                                            <div class="input-group-append">
+                                                <span class="input-group-text">$</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group mb-3">
+                                        <label class="small muted mb-1">Méthode de paiement</label>
+                                        <select id="flexpayMethod" class="form-control" onchange="toggleFlexpayPhone()" required>
+                                            <option value="mobile_money">Mobile Money (M-Pesa, Airtel, Orange)</option>
+                                            <option value="card">Carte bancaire (Visa, Mastercard)</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group mb-3" id="flexpayPhoneGroup">
+                                        <label class="small muted mb-1">Numéro de téléphone</label>
+                                        <input type="tel" id="flexpayPhone" class="form-control" placeholder="ex: 243891234567">
+                                        <small class="muted d-block mt-1">Numéro au format 243... pour recevoir le prompt de paiement</small>
+                                    </div>
+
+                                    <button type="submit" id="btnSubmitFlexPay" class="btn btn-primary btn-block mt-3">
+                                        <i class="fas fa-check-circle mr-1"></i>
+                                        Procéder au paiement
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -451,6 +511,83 @@ try {
         showModal('modalChoixPaiement');
     }
 
+    /* ===== choix FlexPay ===== */
+    function choisirFlexPay() {
+        closeModal('modalChoixPaiement');
+
+        document.getElementById('flexpayType').value = PAY_TYPE;
+        document.getElementById('flexpayAmount').value = PAY_AMOUNT;
+        document.getElementById('flexpayAlert').innerHTML = '';
+        toggleFlexpayPhone();
+
+        showModal('modalFlexPay');
+    }
+
+    function toggleFlexpayPhone() {
+        const method = document.getElementById('flexpayMethod').value;
+        const phoneGroup = document.getElementById('flexpayPhoneGroup');
+        const phoneInput = document.getElementById('flexpayPhone');
+        if (method === 'mobile_money') {
+            phoneGroup.style.display = 'block';
+            phoneInput.setAttribute('required', 'required');
+        } else {
+            phoneGroup.style.display = 'none';
+            phoneInput.removeAttribute('required');
+        }
+    }
+
+    /* ===== soumission FlexPay ===== */
+    function soumettreFlexPay(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSubmitFlexPay');
+        const alertBox = document.getElementById('flexpayAlert');
+        const type = document.getElementById('flexpayType').value;
+        const amount = document.getElementById('flexpayAmount').value;
+        const method = document.getElementById('flexpayMethod').value;
+        const phone = document.getElementById('flexpayPhone').value;
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Traitement en cours...';
+        alertBox.innerHTML = '';
+
+        const params = new URLSearchParams();
+        params.append('type', type);
+        params.append('montant', amount);
+        params.append('method', method);
+        params.append('telephone', phone);
+
+        fetch('service/initier_paiement_flexpay.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check-circle mr-1"></i> Procéder au paiement';
+
+            if (data.success) {
+                if (data.redirect_url) {
+                    // Paiement par carte -> Redirection vers l'URL sécurisée FlexPay
+                    window.location.href = data.redirect_url;
+                } else {
+                    // Mobile Money -> Message de succès invitant l'élève à valider son PIN
+                    alertBox.innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
+                    setTimeout(() => {
+                        location.reload();
+                    }, 4000);
+                }
+            } else {
+                alertBox.innerHTML = '<div class="alert alert-danger">' + (data.message || 'Erreur lors de la transaction') + '</div>';
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check-circle mr-1"></i> Procéder au paiement';
+            alertBox.innerHTML = '<div class="alert alert-danger">Erreur de communication réseau. Veuillez réessayer.</div>';
+        });
+    }
+
     /* ===== choix cash ===== */
     function choisirCash() {
         closeModal('modalChoixPaiement');
@@ -461,10 +598,10 @@ try {
         showModal('modalCash');
     }
 
-    /* ===== online ===== */
+    /* ===== online (MaxiCash / Redirection paiement.php) ===== */
     function choisirOnline() {
         window.location.href =
-            'maxicash/paiement.php?type=' +
+            'paiement.php?type=' +
             encodeURIComponent(PAY_TYPE) +
             '&montant=' +
             encodeURIComponent(PAY_AMOUNT);
