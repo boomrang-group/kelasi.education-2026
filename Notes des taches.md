@@ -139,3 +139,96 @@ executer dans data :
 
  Get-ChildItem -File | Rename-Item -NewName {$_.name -replace ' ', '_'}
  ALTER TABLE `students` ADD `id_user` INT NOT NULL AFTER `statut`;
+
+10.10.2026
+ALTER TABLE users MODIFY COLUMN role ENUM('promoteur','admin','prof','eleve','manager','eleve_encadre') NOT NULL;
+ALTER TABLE `users` CHANGE `role` `role` ENUM('promoteur','admin','prof','eleve','manager','eleve_encadre','repetiteur') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL;
+
+CREATE TABLE cours_repetitorat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nom VARCHAR(255) NOT NULL,
+    teacher_user_id INT NOT NULL,
+    code_ecole VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_rep_teacher (teacher_user_id),
+    INDEX idx_rep_ecole (code_ecole)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE lecons_repetitorat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    cours_id INT NOT NULL,
+    titre VARCHAR(255) NOT NULL,
+    ordre INT NOT NULL DEFAULT 1,
+    is_published TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_rep_lecons_cours (cours_id),
+
+    CONSTRAINT fk_lecons_repetitorat_cours
+        FOREIGN KEY (cours_id)
+        REFERENCES cours_repetitorat(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE lecon_contenus_repetitorat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    lecon_id INT NOT NULL,
+    type_contenu ENUM('pdf', 'image', 'audio', 'video') NOT NULL,
+    contenu_id INT NOT NULL,
+    ordre INT NOT NULL DEFAULT 1,
+
+    INDEX idx_rep_contenus_lecon (lecon_id),
+
+    CONSTRAINT fk_contenus_repetitorat_lecon
+        FOREIGN KEY (lecon_id)
+        REFERENCES lecons_repetitorat(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+#20.10.2026
+CREATE TABLE IF NOT EXISTS quiz_repetitorat(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    cours_id INT NOT NULL,
+    teacher_user_id INT NOT NULL,
+    code_ecole VARCHAR(50) NOT NULL,
+    titre VARCHAR(255) NOT NULL,
+    type_quiz ENUM('qcm', 'qr', 'pj') DEFAULT 'qcm',
+    description TEXT NULL,
+    fichier_pj VARCHAR(255) NULL,
+    is_published TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Si elles n'existent pas du tout, voici leur création directe :
+CREATE TABLE IF NOT EXISTS quiz_questions_repetitorat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    quiz_id INT NOT NULL,
+    question_texte TEXT NOT NULL,
+    type_question ENUM('qcm', 'qr') DEFAULT 'qcm',
+    points INT DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS quiz_options_repetitorat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT NOT NULL,
+    option_texte TEXT NOT NULL,
+    est_correcte TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS `quiz_resultats_repetitorat` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `quiz_id` int(11) NOT NULL,
+ `student_id` int(11) NOT NULL,
+ `note_obtenue` decimal(5,2) NOT NULL DEFAULT 0.00,
+ `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
+ PRIMARY KEY (`id`),
+ KEY `idx_qrr_quiz` (`quiz_id`),
+ KEY `idx_qrr_student` (`student_id`),
+ CONSTRAINT `fk_qrr_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quiz_repetitorat` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+ CONSTRAINT `fk_qrr_student` FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

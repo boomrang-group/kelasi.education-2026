@@ -11,19 +11,35 @@ session_start();
 
 // Déjà connecté ?
 if (!empty($_SESSION['role'])) {
-    $r = strtolower((string)$_SESSION['role']);
+    $r = strtolower(trim((string) $_SESSION['role']));
+
     if ($r === 'admin') {
-        header('Location: ../admin/dashboard.php'); exit;
-    } elseif ($r === 'manager') {
-        header('Location: ../manager/dashboard.php'); exit;
+        header('Location: ../admin/dashboard.php');
+        exit;
     } elseif ($r === 'promoteur') {
-        header('Location: ../my_school/dashboard.php'); exit;
+        header('Location: ../my_school/dashboard.php');
+        exit;
+    } elseif ($r === 'manager') {
+        header('Location: ../manager/dashboard.php');
+        exit;
     } elseif ($r === 'prof') {
-        header('Location: ../customs/teacher/view/dashboard.php'); exit;
+        header('Location: ../customs/teacher/view/dashboard.php');
+        exit;
     } elseif ($r === 'eleve') {
-        header('Location: ../customs/students/view/dashboard.php'); exit;
+        header('Location: ../customs/students/view/dashboard.php');
+        exit;
+    } elseif ($r === 'eleve_encadre') {
+        header('Location: ../repetitorats/students/dashboard.php');
+        exit;
+    } elseif ($r === 'repetiteur') {
+        header('Location: ../repetitorats/teachers/dashboard.php');
+        exit;
     } else {
-        header('Location: ../my_school/dashboard.php'); exit;
+        // Rôle inconnu : afficher la page de connexion.
+        session_unset();
+        session_destroy();
+        header('Location: index.php?erreur=role_inconnu');
+        exit;
     }
 }
 
@@ -52,7 +68,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $login_identifier = trim((string)($_POST['login_identifier'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
 
-    if ($login_identifier === '') $errors[] = "Nom d'utilisateur ou e-mail est requis.";
+    if ($login_identifier === '') $errors[] = "Nom d'utilisateur est requis.";
     if ($password === '')         $errors[] = "Mot de passe est requis.";
 
     if (!$errors) {
@@ -143,19 +159,35 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         } catch(Throwable $e){}
                     }
 
-                    // Redirection
-                    $r = $_SESSION['role'];
-                    if ($r === 'admin') {
-                        header('Location: ../admin/dashboard.php'); exit;
-                    } elseif ($r === 'promoteur') {
-                        header('Location: ../my_school/dashboard.php'); exit;
-                    } elseif ($r === 'manager') {
-                        header('Location: ../manager/dashboard.php'); exit;
-                    } elseif ($r === 'prof') {
-                        header('Location: ../customs/teacher/view/dashboard.php'); exit;
-                    } else {
-                        header('Location: ../customs/students/view/dashboard.php'); exit;
-                    }
+                                       // Redirection
+                $r = strtolower(trim((string) $_SESSION['role']));
+
+                if ($r === 'admin') {
+                    header('Location: ../admin/dashboard.php');
+                    exit;
+                } elseif ($r === 'promoteur') {
+                    header('Location: ../my_school/dashboard.php');
+                    exit;
+                } elseif ($r === 'manager') {
+                    header('Location: ../manager/dashboard.php');
+                    exit;
+                } elseif ($r === 'prof') {
+                    header('Location: ../customs/teacher/view/dashboard.php');
+                    exit;
+                } elseif ($r === 'eleve') {
+                    header('Location: ../customs/students/view/dashboard.php');
+                    exit;
+                } elseif ($r === 'eleve_encadre') {
+                    header('Location: ../repetitorats/students/dashboard.php');
+                    exit;
+                } elseif ($r === 'repetiteur') {
+                    header('Location: ../repetitorats/teachers/dashboard.php');
+                    exit;
+                } else {
+                    // Rôle inconnu : ne pas rediriger vers un espace par défaut.
+                    header('Location: index.php?erreur=role_inconnu');
+                    exit;
+                }
                 }
             }
 
@@ -261,9 +293,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <form action="index.php" method="post" class="login-form" autocomplete="off" novalidate>
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                     <div class="form-group">
-                        <label for="login_identifier">Nom d'utilisateur ou e-mail</label>
+                        <label for="login_identifier">Nom d'utilisateur</label>
                         <input type="text" id="login_identifier" name="login_identifier"
-                            placeholder="Nom d'utilisateur ou e-mail" class="form-control"
+                            placeholder="Mehdou Mbula" class="form-control"
                             value="<?= htmlspecialchars($login_identifier, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>"
                             required autocomplete="username">
                     </div>
@@ -287,7 +319,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <div class="form-group">
                         <button type="submit" class="login-btn w-100">Se connecter</button>
                     </div>
-                    <a href="../new_school" class = "nav-link">Vous avez pas un compte ? Créer un compte</a>
+                    <a href="../new_school" class="nav-link">Vous avez pas un compte ? Créer un compte</a>
                 </form>
 
                 <div class="text-center mt-3">

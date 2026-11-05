@@ -236,6 +236,15 @@ if (!$userId) {
                                 <span class="card-desc">Profil établissement</span>
                             </a>
 
+                            <a href="repetitorats/" class="settings-card">
+                                <i class="fas fa-chevron-right action-arrow"></i>
+                                <div class="icon-box">
+                                    <i class="fas fa-school"></i>
+                                </div>
+                                <span class="card-title">Repetitorat</span>
+                                <span class="card-desc">Gestion des répetitaire</span>
+                            </a>
+
                         </div>
 
                     </div>
