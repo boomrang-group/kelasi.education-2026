@@ -29,13 +29,18 @@ if ($app_env === 'development') {
     if (!defined('DEBUG')) define('DEBUG', false);
 }
 
+// Jitsi App Secret Configuration
+if (!defined('JITSI_APP_SECRET')) {
+    define('JITSI_APP_SECRET', getenv('JITSI_APP_SECRET') ?: 'mykelasi_jitsi_secure_key_2025');
+}
+
 // Security Headers
 if (!headers_sent()) {
     header("X-Content-Type-Options: nosniff");
     header("X-Frame-Options: SAMEORIGIN");
     header("X-XSS-Protection: 1; mode=block");
     header("Referrer-Policy: strict-origin-when-cross-origin");
-    header("Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:;");
+    header("Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com https://cdnjs.cloudflare.com https://meet.jit.si 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; frame-src 'self' https://meet.jit.si; connect-src 'self' https://meet.jit.si wss://meet.jit.si;");
 }
 
 // Set PDO options

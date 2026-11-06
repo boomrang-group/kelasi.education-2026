@@ -107,10 +107,12 @@
                              Mes cours
                          </a>
                      </li>
-                     <!--<li class="nav-item">-->
-                     <!--    <a href="live.php" class="nav-link"><i class="fas fa-angle-right"></i>Cours en-->
-                     <!--        direct</a>-->
-                     <!--</li>-->
+                     <li class="nav-item">
+                         <a href="live.php" class="nav-link">
+                             <i class="fas fa-video"></i>
+                             Cours en direct
+                         </a>
+                     </li>
                  </ul>
              </li>
              <li class="d-none nav-item sidebar-nav-item">

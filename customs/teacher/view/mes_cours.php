@@ -9,6 +9,7 @@ header('Content-Type: text/html; charset=utf-8');
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 require_once '../../../database/db_connect.php';
+require_once '../../../service/LiveClassService.php';
 
 // ---- Sécurité minimale : rôle prof requis ----
 if (empty($_SESSION['role']) || strtolower((string)$_SESSION['role']) !== 'prof') {
@@ -605,6 +606,13 @@ try {
                             <div class="cours-header" id="heading-<?= $cid ?>">
                                 <strong><?= e($c['nom']) ?></strong>
                                 <div class="actions-cours">
+                                    <!-- Bouton Cours en direct / Live -->
+                                    <a class="btn btn-lg btn-warning"
+                                        href="live.php"
+                                        title="Planifier ou démarrer un cours en direct">
+                                        <i class="fas fa-video"></i> Direct
+                                    </a>
+
                                     <!-- Nouveau bouton QUIZ au niveau du COURS -->
                                     <a class="btn btn-lg btn-success"
                                         href="composition_mes_quiz.php?cours_id=<?= $cid ?>"

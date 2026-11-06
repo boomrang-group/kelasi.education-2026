@@ -62,6 +62,13 @@
                 </a>
             </li> -->
 
+            <!-- Cours en direct -->
+            <li class="nav-item">
+                <a href="../view/live.php" class="nav-link position-relative">
+                    <i class="fas fa-video"></i> <span>Cours en direct</span>
+                </a>
+            </li>
+
             <!-- Cours/Lecons -->
             <li class="nav-item">
                 <a href="mes_cours.php" class="nav-link position-relative">
