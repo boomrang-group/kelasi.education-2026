@@ -77,9 +77,16 @@ $classSessions = $liveService->getLivesForStudent($studentClassId, $code_ecole);
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <title>Mes cours en direct | MyKelasi</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="../../css/bootstrap.min.css">
-    <link rel="stylesheet" href="../../css/all.min.css">
-    <link rel="stylesheet" href="../../style.css">
+    <link rel="shortcut icon" type="image/x-icon" href="../../../img/favicon.png">
+    <link rel="stylesheet" href="../../../css/normalize.css">
+    <link rel="stylesheet" href="../../../css/main.css">
+    <link rel="stylesheet" href="../../../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../../../css/all.min.css">
+    <link rel="stylesheet" href="../../../fonts/flaticon.css">
+    <link rel="stylesheet" href="../../../css/animate.min.css">
+    <link rel="stylesheet" href="../../../style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="../../../js/modernizr-3.6.0.min.js"></script>
     <!-- Jitsi Meet External API -->
     <script src="https://meet.jit.si/external_api.js"></script>
     <style>
@@ -236,10 +243,14 @@ $classSessions = $liveService->getLivesForStudent($studentClassId, $code_ecole);
                     </div>
                 <?php endif; ?>
 
+                <?php include '../layout/footer.php'; ?>
             </div>
         </div>
     </div>
-    <script src="../../js/jquery-3.3.1.min.js"></script>
-    <script src="../../js/bootstrap.min.js"></script>
+    <script src="../../../js/jquery-3.3.1.min.js"></script>
+    <script src="../../../js/plugins.js"></script>
+    <script src="../../../js/popper.min.js"></script>
+    <script src="../../../js/bootstrap.min.js"></script>
+    <script src="../../../js/main.js"></script>
 </body>
 </html>

@@ -608,7 +608,7 @@ try {
                                 <div class="actions-cours">
                                     <!-- Bouton Cours en direct / Live -->
                                     <a class="btn btn-lg btn-warning"
-                                        href="live.php"
+                                        href="live.php?cours_id=<?= $cid ?>"
                                         title="Planifier ou démarrer un cours en direct">
                                         <i class="fas fa-video"></i> Direct
                                     </a>
