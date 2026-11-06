@@ -23,6 +23,7 @@ header('Content-Type: text/html; charset=utf-8');
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 require_once '../../../database/db_connect.php';
+require_once '../../../service/LiveClassService.php';
 if (isset($pdo) && $pdo instanceof PDO) { try { $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, true); } catch(Throwable $e){} }
 
 if (empty($_SESSION['role']) || strtolower($_SESSION['role']) !== 'eleve') {
@@ -147,6 +148,18 @@ if(!$student){
     $classId=(int)$student['class_id'];
     $studentId=(int)$student['id'];
     $courses=getCoursesAndLessons($pdo, $classId, $code_ecole);
+
+    $liveService = new LiveClassService($pdo);
+    $allClassLives = $liveService->getLivesForStudent($classId, (string)$code_ecole);
+    // Indexer les lives par cours_id
+    $livesByCourse = [];
+    foreach ($allClassLives as $lv) {
+        $cid = (int)$lv['cours_id'];
+        if (!isset($livesByCourse[$cid])) {
+            $livesByCourse[$cid] = [];
+        }
+        $livesByCourse[$cid][] = $lv;
+    }
 
     // Pour chaque cours, associer quiz et état de verrouillage
     foreach($courses as &$course){
@@ -296,9 +309,28 @@ require_once __DIR__ . '/../layout/check_payment.php';
                 </div>
 
                 <?php foreach ($courses as $course): ?>
+                <?php
+                    $courseId = (int)$course['course_id'];
+                    $courseLives = $livesByCourse[$courseId] ?? [];
+                ?>
                 <div class="card course-card">
                     <div class="card-header d-flex align-items-center justify-content-between">
-                        <h5 class="mb-0"><?= h($course['course_name']) ?></h5>
+                        <div>
+                            <h5 class="mb-0 d-inline-block"><?= h($course['course_name']) ?></h5>
+                            <?php if ($courseLives): ?>
+                                <?php foreach ($courseLives as $clive): ?>
+                                    <?php if ($clive['status'] === 'live'): ?>
+                                        <a href="live.php?session_id=<?= (int)$clive['id'] ?>" class="btn btn-sm btn-danger ml-2 animate-pulse font-weight-bold">
+                                            <i class="fas fa-video"></i> Rejoindre le cours en direct
+                                        </a>
+                                    <?php elseif ($clive['status'] === 'scheduled'): ?>
+                                        <button class="btn btn-sm btn-outline-secondary ml-2" disabled title="Le professeur n'a pas encore lancé la session">
+                                            <i class="fas fa-clock"></i> Direct programmé (En attente du professeur)
+                                        </button>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
                         <span class="muted"><?= count($course['lessons']) ?> leçon(s)</span>
                     </div>
                     <div class="card-body">
