@@ -7,11 +7,16 @@ class LiveClassService
     private PDO $pdo;
     private string $secret;
 
+    private static bool $tableChecked = false;
+
     public function __construct(PDO $pdo, ?string $secret = null)
     {
         $this->pdo = $pdo;
         $this->secret = $secret ?? (defined('JITSI_APP_SECRET') ? JITSI_APP_SECRET : (getenv('JITSI_APP_SECRET') ?: 'mykelasi_jitsi_default_secret'));
-        $this->ensureTableExists();
+        if (!self::$tableChecked) {
+            $this->ensureTableExists();
+            self::$tableChecked = true;
+        }
     }
 
     /**

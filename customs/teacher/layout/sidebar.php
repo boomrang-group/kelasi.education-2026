@@ -71,7 +71,7 @@
 
             <!-- Cours/Lecons -->
             <li class="nav-item">
-                <a href="mes_cours.php" class="nav-link position-relative">
+                <a href="../view/mes_cours.php" class="nav-link position-relative">
                     <i class="fas fa-chalkboard"></i> <span>Mes cours/Lecons</span>
                 </a>
             </li>

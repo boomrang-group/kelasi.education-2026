@@ -85,14 +85,16 @@ if ($sessionId > 0) {
 
 // Récupérer la liste des classes et cours du professeur pour le formulaire de création
 $classesStmt = $pdo->prepare("
-    SELECT DISTINCT c.id, c.nom_classe, c.description, c.niveau, c.section, c.options
+    SELECT DISTINCT c.id, c.classe, c.description, c.niveau, c.section, c.options
     FROM classes c
     JOIN class_subject_teacher cst ON cst.class_id = c.id
     WHERE cst.teacher_user_id = :uid AND c.code_ecole = :ce
-    ORDER BY c.nom_classe
+    ORDER BY c.classe
 ");
 $classesStmt->execute([':uid' => $userId, ':ce' => $code_ecole]);
 $myClasses = $classesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$preselectedCourseId = isset($_GET['cours_id']) ? (int)$_GET['cours_id'] : 0;
 
 $coursStmt = $pdo->prepare("
     SELECT id, nom, class
@@ -119,9 +121,16 @@ if (isset($_GET['msg'])) {
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <title>Cours en direct (Jitsi Meet) | MyKelasi</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="../../css/bootstrap.min.css">
-    <link rel="stylesheet" href="../../css/all.min.css">
-    <link rel="stylesheet" href="../../style.css">
+    <link rel="shortcut icon" type="image/x-icon" href="../../../img/favicon.png">
+    <link rel="stylesheet" href="../../../css/normalize.css">
+    <link rel="stylesheet" href="../../../css/main.css">
+    <link rel="stylesheet" href="../../../css/bootstrap.min.css">
+    <link rel="stylesheet" href="../../../css/all.min.css">
+    <link rel="stylesheet" href="../../../fonts/flaticon.css">
+    <link rel="stylesheet" href="../../../css/animate.min.css">
+    <link rel="stylesheet" href="../../../style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="../../../js/modernizr-3.6.0.min.js"></script>
     <!-- Jitsi Meet External API -->
     <script src="https://meet.jit.si/external_api.js"></script>
     <style>
@@ -252,7 +261,8 @@ if (isset($_GET['msg'])) {
                                             <select name="cours_id" id="cours_select" class="form-control" required onchange="updateClassFromCourse(this)">
                                                 <option value="">Sélectionnez un cours</option>
                                                 <?php foreach ($myCourses as $c): ?>
-                                                    <option value="<?= (int)$c['id'] ?>" data-class="<?= (int)$c['class'] ?>">
+                                                    <?php $isSelected = ($preselectedCourseId === (int)$c['id']) ? 'selected' : ''; ?>
+                                                    <option value="<?= (int)$c['id'] ?>" data-class="<?= (int)$c['class'] ?>" <?= $isSelected ?>>
                                                         <?= e($c['nom']) ?>
                                                     </option>
                                                 <?php endforeach; ?>
@@ -264,8 +274,12 @@ if (isset($_GET['msg'])) {
                                             <select name="class_id" id="class_select" class="form-control" required>
                                                 <option value="">Sélectionnez une classe</option>
                                                 <?php foreach ($myClasses as $cl): ?>
+                                                    <?php
+                                                        $label = trim(($cl['classe'] ?? '') . ' ' . ($cl['description'] ?? '') . ' ' . ($cl['niveau'] ?? '') . ' ' . ($cl['section'] ?? '') . ' ' . ($cl['options'] ?? ''));
+                                                        if ($label === '') $label = 'Classe #' . (int)$cl['id'];
+                                                    ?>
                                                     <option value="<?= (int)$cl['id'] ?>">
-                                                        <?= e($cl['nom_classe'] . ' ' . $cl['niveau'] . ' ' . $cl['section']) ?>
+                                                        <?= e($label) ?>
                                                     </option>
                                                 <?php endforeach; ?>
                                             </select>
@@ -371,13 +385,23 @@ if (isset($_GET['msg'])) {
                                 document.getElementById('class_select').value = classId;
                             }
                         }
+                        document.addEventListener("DOMContentLoaded", function () {
+                            const sel = document.getElementById('cours_select');
+                            if (sel && sel.value) {
+                                updateClassFromCourse(sel);
+                            }
+                        });
                     </script>
                 <?php endif; ?>
 
+                <?php include '../layout/footer.php'; ?>
             </div>
         </div>
     </div>
-    <script src="../../js/jquery-3.3.1.min.js"></script>
-    <script src="../../js/bootstrap.min.js"></script>
+    <script src="../../../js/jquery-3.3.1.min.js"></script>
+    <script src="../../../js/plugins.js"></script>
+    <script src="../../../js/popper.min.js"></script>
+    <script src="../../../js/bootstrap.min.js"></script>
+    <script src="../../../js/main.js"></script>
 </body>
 </html>
