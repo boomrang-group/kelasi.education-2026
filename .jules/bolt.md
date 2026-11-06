@@ -1,0 +1,3 @@
+## 2025-10-04 - Eager Batch-Loading for Nested Hierarchies (N+1 Anti-Pattern)
+**Learning:** Hierarchical catalog views (such as `courses -> lessons -> lesson contents -> media files` in `admin/nos_cours.php`) previously fetched records in nested `foreach` loops. For an institution with C courses, L lessons per course, and M contents per lesson, this generated $1 + C + \sum(L) + \sum(M)$ database round-trips (often dozens or hundreds of queries per page load).
+**Action:** Replace nested per-item queries with eager batch queries using `WHERE id IN (...)` array slicing and map results back in memory via hash lookups (`$map[$id]`). This bounds database query overhead to $O(1)$ constant queries (at most 6 queries total) regardless of the number of courses or contents.
