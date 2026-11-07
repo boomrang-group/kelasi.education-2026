@@ -66,31 +66,37 @@ if ($codeEcole === '') {
 }
 
 try {
-    // KPIs
-    $nbre_classe = (int) fetch_scalar($pdo, "SELECT COUNT(*) FROM classes  WHERE code_ecole = :ce", [':ce'=>$codeEcole], 0);
-    $nbre_prof   = (int) fetch_scalar($pdo, "SELECT COUNT(*) FROM teacher  WHERE code_ecole = :ce", [':ce'=>$codeEcole], 0);
-    $nbre_eleve  = (int) fetch_scalar($pdo, "SELECT COUNT(*) FROM students WHERE code_ecole = :ce", [':ce'=>$codeEcole], 0);
+    // [⚡ Bolt Performance Optimization]
+    // Consolidate 3 individual KPI COUNT queries into a single round-trip.
+    // Distinct parameter placeholders (:c1, :c2, :c3) are required for native PDO prepared statements (ATTR_EMULATE_PREPARES = false).
+    $kpiSql = "SELECT
+        (SELECT COUNT(*) FROM classes  WHERE code_ecole = :c1) AS nbre_classe,
+        (SELECT COUNT(*) FROM teacher  WHERE code_ecole = :c2) AS nbre_prof,
+        (SELECT COUNT(*) FROM students WHERE code_ecole = :c3) AS nbre_eleve";
+    $stKpi = $pdo->prepare($kpiSql);
+    $stKpi->execute([':c1' => $codeEcole, ':c2' => $codeEcole, ':c3' => $codeEcole]);
+    $kpis = $stKpi->fetch(PDO::FETCH_ASSOC) ?: [];
+    $nbre_classe = (int)($kpis['nbre_classe'] ?? 0);
+    $nbre_prof   = (int)($kpis['nbre_prof'] ?? 0);
+    $nbre_eleve  = (int)($kpis['nbre_eleve'] ?? 0);
 
-    // Finances — ventilation
-    $somme_inscription = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0) FROM paiement WHERE code_ecole=:ce AND statut='Inscription'",
-        [':ce'=>$codeEcole], 0.0
-    );
-    $somme_minerval = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0) FROM paiement WHERE code_ecole=:ce AND statut='Minerval'",
-        [':ce'=>$codeEcole], 0.0
-    );
-    $somme_autres = (float) fetch_scalar(
-        $pdo,
-        "SELECT COALESCE(SUM(montant_paye),0)
-           FROM paiement
-          WHERE code_ecole=:ce
-            AND ( statut='Autre' OR (statut IS NOT NULL AND statut<>'' AND statut NOT IN ('Inscription','Minerval')) )",
-        [':ce'=>$codeEcole], 0.0
-    );
-    $finance_total = $somme_inscription + $somme_minerval + $somme_autres;
+    // [⚡ Bolt Performance Optimization]
+    // Consolidate 3 separate paiement queries into a single conditional SUM query.
+    // Instead of scanning table `paiement` 3 times sequentially, aggregates Inscription, Minerval,
+    // and Autres in a single pass over the matching school rows (reducing 6 round-trips to 2).
+    $finSql = "SELECT
+        COALESCE(SUM(CASE WHEN statut = 'Inscription' THEN montant_paye ELSE 0 END), 0) AS somme_inscription,
+        COALESCE(SUM(CASE WHEN statut = 'Minerval' THEN montant_paye ELSE 0 END), 0) AS somme_minerval,
+        COALESCE(SUM(CASE WHEN statut = 'Autre' OR (statut IS NOT NULL AND statut <> '' AND statut NOT IN ('Inscription', 'Minerval')) THEN montant_paye ELSE 0 END), 0) AS somme_autres
+        FROM paiement
+        WHERE code_ecole = :ce";
+    $stFin = $pdo->prepare($finSql);
+    $stFin->execute([':ce' => $codeEcole]);
+    $finances = $stFin->fetch(PDO::FETCH_ASSOC) ?: [];
+    $somme_inscription = (float)($finances['somme_inscription'] ?? 0.0);
+    $somme_minerval    = (float)($finances['somme_minerval'] ?? 0.0);
+    $somme_autres      = (float)($finances['somme_autres'] ?? 0.0);
+    $finance_total     = $somme_inscription + $somme_minerval + $somme_autres;
 
     // Séries 6 derniers mois
     $rows6 = fetch_all(
