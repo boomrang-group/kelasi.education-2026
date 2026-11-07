@@ -11,9 +11,20 @@ require_once '../database/db_connect.php';
 $errors = [];
 $success = '';
 
+// Security: CSRF token generation
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Security: Validate CSRF token
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], (string)$_POST['csrf_token'])) {
+        $errors[] = "Erreur de validation CSRF.";
+    }
+
     $identifier = trim($_POST['identifier'] ?? '');
 
+    if (empty($errors)) {
     if ($identifier === '') {
         $errors[] = "Veuillez entrer votre e-mail ou nom d'utilisateur.";
     } else {
@@ -72,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             error_log("Forgot error: ".$e->getMessage());
             $errors[] = "Erreur lors de la demande. Veuillez réessayer.";
         }
+    }
     }
 }
 ?>
@@ -136,6 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php endif; ?>
 
                 <form method="post" action="forgot.php" class="login-form">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
                     <div class="form-group">
                         <label for="identifier">E-mail ou Nom d'utilisateur</label>
                         <input type="text" id="identifier" name="identifier" class="form-control"
