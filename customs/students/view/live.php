@@ -117,7 +117,7 @@ $classSessions = $liveService->getLivesForStudent($studentClassId, $code_ecole);
             <?php include '../layout/sidebar.php'; ?>
             <div class="dashboard-content-one">
                 <div class="breadcrumbs-area">
-                    <h3>📡 Cours en direct (Visioconférence Jitsi)</h3>
+                    <h3>Cours en direct</h3>
                     <ul>
                         <li><a href="dashboard.php">Accueil</a></li>
                         <li>Cours en direct</li>
