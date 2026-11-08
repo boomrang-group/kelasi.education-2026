@@ -119,7 +119,7 @@ if (isset($_GET['msg'])) {
 <head>
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
-    <title>Cours en direct (Jitsi Meet) | MyKelasi</title>
+    <title>Cours en direct | MyKelasi</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="shortcut icon" type="image/x-icon" href="../../../img/favicon.png">
     <link rel="stylesheet" href="../../../css/normalize.css">
@@ -161,7 +161,7 @@ if (isset($_GET['msg'])) {
             <?php include '../layout/sidebar.php'; ?>
             <div class="dashboard-content-one">
                 <div class="breadcrumbs-area">
-                    <h3>📡 Cours en direct (Visioconférence Jitsi)</h3>
+                    <h3>Cours en direct</h3>
                     <ul>
                         <li><a href="dashboard.php">Accueil</a></li>
                         <li>Cours en direct</li>
