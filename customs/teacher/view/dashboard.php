@@ -399,7 +399,7 @@ $chartQuiz = [
 
                             <div class="table-box-wrap">
                                 <div class="table-responsive student-table-box">
-                                    <table class="table display data-table text-nowrap">
+                                    <table id="teacherStudentsTable" class="table display text-nowrap">
                                         <thead>
                                             <tr>
                                                 <th>ID</th>
@@ -500,7 +500,8 @@ $chartQuiz = [
 
     // DataTables
     if ($.fn.DataTable) {
-        $('.data-table').DataTable({
+        $('#teacherStudentsTable').DataTable({
+            destroy: true,
             pageLength: 10,
             lengthChange: false,
             order: [[2,'asc']],
