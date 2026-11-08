@@ -1,6 +1,8 @@
 <?php
 // register.php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Récupérer et consommer les messages flash s'ils existent
 $errors = $_SESSION['reg_errors'] ?? [];
@@ -11,6 +13,11 @@ unset($_SESSION['reg_errors'], $_SESSION['reg_success']);
 // Pré-remplissage si retour en erreur
 $old = $_SESSION['reg_old'] ?? [];
 unset($_SESSION['reg_old']);
+
+// CSRF Token Generation
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -51,6 +58,7 @@ unset($_SESSION['reg_old']);
     <?php endif; ?>
 
     <form action="register_process.php" method="post" autocomplete="off" novalidate>
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label" for="first_name">Prénom</label>

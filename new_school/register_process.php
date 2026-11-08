@@ -1,6 +1,8 @@
 <?php
 // register_process.php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once '../database/db_connect.php'; // doit définir $pdo (PDO)
 
 $errors = [];
@@ -15,6 +17,12 @@ $APP_LOGIN_URL  = 'https://kelasi.education/mykelasi/my_school/'; // Si tu as un
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   header('Location: new_school/');
   exit;
+}
+
+// CSRF Protection (V05)
+$csrf_token = (string)($_POST['csrf_token'] ?? '');
+if (empty($_SESSION['csrf_token']) || empty($csrf_token) || !hash_equals($_SESSION['csrf_token'], $csrf_token)) {
+  $errors[] = "Erreur de validation CSRF. Veuillez réessayer.";
 }
 
 $first_name       = filter_var(v('first_name'), FILTER_SANITIZE_FULL_SPECIAL_CHARS);
