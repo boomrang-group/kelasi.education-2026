@@ -2,6 +2,7 @@
 // register_process.php
 session_start();
 require_once '../database/db_connect.php'; // doit définir $pdo (PDO)
+require_once '../service/security_helpers.php';
 
 $errors = [];
 
@@ -14,6 +15,13 @@ $APP_LOGIN_URL  = 'https://kelasi.education/mykelasi/my_school/'; // Si tu as un
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   header('Location: new_school/');
+  exit;
+}
+
+// Security Fix (V05): CSRF Protection
+if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+  $_SESSION['reg_errors'] = ["Session expirée ou validation du formulaire invalide. Veuillez réessayer."];
+  header('Location: ../new_school/');
   exit;
 }
 
