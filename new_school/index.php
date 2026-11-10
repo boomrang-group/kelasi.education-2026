@@ -1,6 +1,7 @@
 <?php
 // register.php
 session_start();
+require_once __DIR__ . '/../service/security_helpers.php';
 
 // Récupérer et consommer les messages flash s'ils existent
 $errors = $_SESSION['reg_errors'] ?? [];
@@ -51,6 +52,7 @@ unset($_SESSION['reg_old']);
     <?php endif; ?>
 
     <form action="register_process.php" method="post" autocomplete="off" novalidate>
+      <?php csrf_input(); ?>
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label" for="first_name">Prénom</label>
