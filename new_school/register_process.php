@@ -1,7 +1,8 @@
 <?php
 // register_process.php
 session_start();
-require_once '../database/db_connect.php'; // doit définir $pdo (PDO)
+require_once __DIR__ . '/../database/db_connect.php'; // doit définir $pdo (PDO)
+require_once __DIR__ . '/../service/security_helpers.php';
 
 $errors = [];
 
@@ -26,6 +27,12 @@ $password         = (string)($_POST['password'] ?? '');
 $confirm_password = (string)($_POST['confirm_password'] ?? '');
 $numero_bancaire  = v('numero_bancaire');
 $role             = 'promoteur'; // <-- rôle attendu ici
+$csrf_token       = (string)($_POST['csrf_token'] ?? '');
+
+// Validation de sécurité CSRF (V05)
+if (!verify_csrf_token($csrf_token)) {
+  $errors[] = "Session expirée ou requête invalide (erreur CSRF). Veuillez réessayer.";
+}
 
 // Validation
 if ($first_name === '')  $errors[] = "Le prénom est requis.";
