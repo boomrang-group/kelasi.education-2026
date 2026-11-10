@@ -1,0 +1,3 @@
+## 2025-10-15 - Dashboard Finance Aggregation Consolidation
+**Learning:** In dashboard statistics services like `admin/service/dashboard-admin.php`, computing multiple financial totals across status categories (`Inscription`, `Minerval`, `Autre`) via multiple scalar `SELECT COALESCE(SUM(...))` queries triggers redundant full table scans and database round-trips over the `paiement` table.
+**Action:** Consolidate multiple status-filtered aggregations on the same table into a single `SELECT SUM(CASE WHEN ... THEN montant ELSE 0 END)` query, reducing database round-trips by 66% while keeping scalar memory overhead minimal.
