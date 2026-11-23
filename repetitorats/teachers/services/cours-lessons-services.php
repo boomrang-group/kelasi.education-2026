@@ -292,6 +292,38 @@ try {
     );
     $stCoursList->execute([':uid' => $userId, ':ce' => $codeEcole]);
     $mesCours = $stCoursList->fetchAll(PDO::FETCH_ASSOC);
+
+    // Résolution dynamique du chemin du fichier rattaché pour affichage et ouverture
+    foreach ($mesCours as &$row) {
+        $row['fichier_path'] = '';
+        if (!empty($row['contenu_id']) && !empty($row['type_contenu'])) {
+            $t = $row['type_contenu'];
+            $cid = (int)$row['contenu_id'];
+            $filename = '';
+            if ($t === 'pdf') {
+                $stF = $pdo->prepare('SELECT filename FROM pdfs WHERE id = :id LIMIT 1');
+                $stF->execute([':id' => $cid]);
+                $filename = $stF->fetchColumn();
+            } elseif ($t === 'image') {
+                $stF = $pdo->prepare('SELECT filename FROM images WHERE id = :id LIMIT 1');
+                $stF->execute([':id' => $cid]);
+                $filename = $stF->fetchColumn();
+            } elseif ($t === 'audio') {
+                $stF = $pdo->prepare('SELECT fichier FROM audios WHERE id = :id LIMIT 1');
+                $stF->execute([':id' => $cid]);
+                $filename = $stF->fetchColumn();
+            } elseif ($t === 'video') {
+                $stF = $pdo->prepare('SELECT filename FROM videos WHERE id = :id LIMIT 1');
+                $stF->execute([':id' => $cid]);
+                $filename = $stF->fetchColumn();
+            }
+            if ($filename) {
+                $row['fichier_path'] = '../../uploads/cours_repetitorats/' . $filename;
+            }
+        }
+    }
+    unset($row);
+
 } catch (Throwable $e) {
     $errorMsg = $errorMsg !== '' ? $errorMsg : 'Impossible de récupérer la liste des cours.';
 }

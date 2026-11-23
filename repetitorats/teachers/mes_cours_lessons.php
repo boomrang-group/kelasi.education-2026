@@ -10,11 +10,16 @@ require_once __DIR__ . '/services/cours-lessons-services.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kelasi | Gestion des Cours & Leçons</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
 
+    <!-- FontAwesome 6 CSS (Fix pour les icônes) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Bootstrap Icons CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
     <style>
     :root {
         --sidebar-width: 240px;
@@ -77,21 +82,21 @@ require_once __DIR__ . '/services/cours-lessons-services.php';
             <?php require_once __DIR__ . '/includes/sidebar.php'; ?>
 
             <div class="dashboard-content-one">
-                <div class="breadcrumbs-area">
-                    <h3 style="text-transform: uppercase;">GESTION DES COURS & LEÇONS</h3>
+                <div class="breadcrumbs-area mb-4">
+                    <h3 style="text-transform: uppercase;"><i class="fa-solid fa-book-open-reader me-2 text-primary"></i> GESTION DES COURS & LEÇONS</h3>
                     <p>Créez vos supports pédagogiques multimédias et publiez-les pour vos élèves encadrés.</p>
                 </div>
 
-                <?php if ($successMsg !== ''): ?>
+                <?php if (!empty($successMsg)): ?>
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="fa fa-check-circle me-2"></i> <?= htmlspecialchars($successMsg, ENT_QUOTES, 'UTF-8') ?>
+                    <i class="fa-solid fa-check-circle me-2"></i> <?= htmlspecialchars($successMsg, ENT_QUOTES, 'UTF-8') ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
                 <?php endif; ?>
 
-                <?php if ($errorMsg !== ''): ?>
+                <?php if (!empty($errorMsg)): ?>
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="fa fa-exclamation-circle me-2"></i>
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>
                     <?= htmlspecialchars($errorMsg, ENT_QUOTES, 'UTF-8') ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
@@ -99,9 +104,7 @@ require_once __DIR__ . '/services/cours-lessons-services.php';
 
                 <!-- Formulaire de création -->
                 <div class="card-custom">
-                    <h4 class="text-primary fw-bold mb-4"><i class="bi bi-plus-circle me-2"></i> Ajouter une nouvelle
-                        leçon /
-                        cours</h4>
+                    <h4 class="text-primary fw-bold mb-4"><i class="bi bi-plus-circle me-2"></i> Ajouter une nouvelle leçon / cours</h4>
                     <form action="mes_cours_lessons.php" method="POST" enctype="multipart/form-data">
                         <input type="hidden" name="action" value="create_cours">
 
@@ -111,9 +114,9 @@ require_once __DIR__ . '/services/cours-lessons-services.php';
                                 <input type="text" name="nom_cours" class="form-control" list="cours-existants"
                                     placeholder="Sélectionnez ou tapez un cours..." required>
                                 <datalist id="cours-existants">
-                                    <?php foreach ($existingCourses as $cName): ?>
+                                    <?php if (!empty($existingCourses)): foreach ($existingCourses as $cName): ?>
                                     <option value="<?= htmlspecialchars($cName, ENT_QUOTES, 'UTF-8') ?>">
-                                        <?php endforeach; ?>
+                                    <?php endforeach; endif; ?>
                                 </datalist>
                             </div>
                         </div>
@@ -138,24 +141,19 @@ require_once __DIR__ . '/services/cours-lessons-services.php';
                         </div>
 
                         <div class="mb-4 form-check">
-                            <input type="checkbox" name="is_published" class="form-check-input" id="pubCheck" value="1"
-                                checked>
-                            <label class="form-check-label fw-bold text-success" for="pubCheck">Publier immédiatement
-                                (visible
-                                par les élèves)</label>
+                            <input type="checkbox" name="is_published" class="form-check-input" id="pubCheck" value="1" checked>
+                            <label class="form-check-label fw-bold text-success" for="pubCheck">Publier immédiatement (visible par les élèves)</label>
                         </div>
 
                         <button type="submit" class="btn btn-primary px-4 py-2 fw-bold">
-                            <i class="fa fa-upload me-2"></i> Enregistrer et Publier le cours
+                            <i class="fa-solid fa-upload me-2"></i> Enregistrer et Publier le cours
                         </button>
                     </form>
                 </div>
 
                 <!-- Liste des cours existants -->
                 <div class="card-custom">
-                    <h4 class="text-dark fw-bold mb-4"><i class="bi bi-journal-text me-2"></i> Mes cours et leçons
-                        enregistrés
-                    </h4>
+                    <h4 class="text-dark fw-bold mb-4"><i class="bi bi-journal-text me-2"></i> Mes cours et leçons enregistrés</h4>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
                             <thead>
@@ -173,29 +171,24 @@ require_once __DIR__ . '/services/cours-lessons-services.php';
                                 <?php if (!empty($mesCours)): foreach ($mesCours as $idx => $c): ?>
                                 <tr>
                                     <td><?= $idx + 1 ?></td>
-                                    <td><strong><?= htmlspecialchars($c['cours_nom'], ENT_QUOTES, 'UTF-8') ?></strong>
-                                    </td>
-                                    <td><?= htmlspecialchars($c['lecon_titre'] ?? 'Aucune leçon', ENT_QUOTES, 'UTF-8') ?>
-                                    </td>
+                                    <td><strong><?= htmlspecialchars($c['cours_nom'], ENT_QUOTES, 'UTF-8') ?></strong></td>
+                                    <td><?= htmlspecialchars($c['lecon_titre'] ?? 'Aucune leçon', ENT_QUOTES, 'UTF-8') ?></td>
                                     <td>
-                                        <?php if (!empty($c['type_contenu'])): ?>
-                                        <span class="badge bg-info text-dark text-uppercase"><i
-                                                class="bi bi-paperclip"></i>
-                                            <?= htmlspecialchars($c['type_contenu'], ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php if (!empty($c['fichier_path'])): ?>
+                                            <a href="<?= htmlspecialchars($c['fichier_path'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" class="btn btn-sm btn-info text-dark fw-semibold text-decoration-none">
+                                                <i class="bi bi-file-earmark-arrow-down me-1"></i> Ouvrir
+                                            </a>
+                                        <?php elseif (!empty($c['type_contenu'])): ?>
+                                            <span class="badge bg-secondary text-uppercase"><i class="bi bi-paperclip"></i> <?= htmlspecialchars($c['type_contenu'], ENT_QUOTES, 'UTF-8') ?></span>
                                         <?php else: ?>
-                                        <span class="text-muted small">Aucune</span>
+                                            <span class="text-muted small">Aucune</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
                                         <?php if (!empty($c['lecon_id'])): ?>
-                                        <select class="form-select form-select-sm status-select"
-                                            data-lecon-id="<?= (int)$c['lecon_id'] ?>" style="width: 120px;">
-                                            <option value="1" <?= ((int)$c['is_published'] === 1) ? 'selected' : '' ?>>
-                                                Publié
-                                            </option>
-                                            <option value="0" <?= ((int)$c['is_published'] === 0) ? 'selected' : '' ?>>
-                                                Brouillon
-                                            </option>
+                                        <select class="form-select form-select-sm status-select" data-lecon-id="<?= (int)$c['lecon_id'] ?>" style="width: 120px;">
+                                            <option value="1" <?= ((int)$c['is_published'] === 1) ? 'selected' : '' ?>>Publié</option>
+                                            <option value="0" <?= ((int)$c['is_published'] === 0) ? 'selected' : '' ?>>Brouillon</option>
                                         </select>
                                         <?php else: ?>
                                         <span class="badge bg-light text-muted">Vide</span>
@@ -208,6 +201,7 @@ require_once __DIR__ . '/services/cours-lessons-services.php';
                                             data-cours="<?= htmlspecialchars($c['cours_nom'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-lecon="<?= htmlspecialchars($c['lecon_titre'], ENT_QUOTES, 'UTF-8') ?>"
                                             data-type="<?= htmlspecialchars($c['type_contenu'] ?? 'Aucun', ENT_QUOTES, 'UTF-8') ?>"
+                                            data-fichier="<?= htmlspecialchars($c['fichier_path'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                             data-bs-toggle="modal" data-bs-target="#viewModal" title="Voir">
                                             <i class="bi bi-eye"></i>
                                         </button>
@@ -227,163 +221,157 @@ require_once __DIR__ . '/services/cours-lessons-services.php';
                                 </tr>
                                 <?php endforeach; else: ?>
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">Vous n'avez pas encore créé de
-                                        cours.
-                                    </td>
+                                    <td colspan="7" class="text-center text-muted py-4">Vous n'avez pas encore créé de cours.</td>
                                 </tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
                 </div>
-                </main>
+            </div>
+        </div>
+    </div>
 
-                <!-- Modal Voir -->
-                <div class="modal fade" id="viewModal" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title fw-bold">Détails de la Leçon</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <p><strong>Cours :</strong> <span id="modalCours"></span></p>
-                                <p><strong>Leçon :</strong> <span id="modalLecon"></span></p>
-                                <p><strong>Type de média :</strong> <span id="modalType" class="text-uppercase"></span>
-                                </p>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary btn-sm"
-                                    data-bs-dismiss="modal">Fermer</button>
-                            </div>
-                        </div>
+    <!-- Modal Voir -->
+    <div class="modal fade" id="viewModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Détails de la Leçon</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Cours :</strong> <span id="modalCours"></span></p>
+                    <p><strong>Leçon :</strong> <span id="modalLecon"></span></p>
+                    <p><strong>Type de média :</strong> <span id="modalType" class="text-uppercase"></span></p>
+                    <div id="modalFileContainer" class="mt-3">
+                        <!-- Lien injecté dynamiquement pour ouvrir le fichier -->
                     </div>
                 </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                <!-- Modal Modifier -->
-                <div class="modal fade" id="editModal" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <form action="mes_cours_lessons.php" method="POST">
-                                <input type="hidden" name="action" value="edit_lecon">
-                                <input type="hidden" name="lecon_id" id="editLeconId">
-                                <div class="modal-header">
-                                    <h5 class="modal-title fw-bold">Modifier la Leçon</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="mb-3">
-                                        <label class="form-label fw-bold">Titre de la Leçon</label>
-                                        <input type="text" name="titre_lecon" id="editTitreLecon" class="form-control"
-                                            required>
-                                    </div>
-                                    <div class="mb-3 form-check">
-                                        <input type="checkbox" name="is_published" class="form-check-input"
-                                            id="editPubCheck" value="1">
-                                        <label class="form-check-label fw-bold" for="editPubCheck">Publié</label>
-                                    </div>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary btn-sm"
-                                        data-bs-dismiss="modal">Annuler</button>
-                                    <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
-                                </div>
-                            </form>
+    <!-- Modal Modifier -->
+    <div class="modal fade" id="editModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="mes_cours_lessons.php" method="POST">
+                    <input type="hidden" name="action" value="edit_lecon">
+                    <input type="hidden" name="lecon_id" id="editLeconId">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold">Modifier la Leçon</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Titre de la Leçon</label>
+                            <input type="text" name="titre_lecon" id="editTitreLecon" class="form-control" required>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" name="is_published" class="form-check-input" id="editPubCheck" value="1">
+                            <label class="form-check-label fw-bold" for="editPubCheck">Publié</label>
                         </div>
                     </div>
-                </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-                <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
-                    integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
-                    crossorigin="anonymous">
-                </script>
-                <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"
-                    integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y"
-                    crossorigin="anonymous">
-                </script>
-                <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    document.querySelectorAll('.status-select').forEach(function(select) {
-                        select.addEventListener('change', function() {
-                            let leconId = this.getAttribute('data-lecon-id');
-                            let newStatus = this.value;
-                            let selectElement = this;
+    <!-- Scripts JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Gestion AJAX du changement de statut de publication
+        document.querySelectorAll('.status-select').forEach(function(select) {
+            select.addEventListener('change', function() {
+                let leconId = this.getAttribute('data-lecon-id');
+                let newStatus = this.value;
+                let selectElement = this;
 
-                            let formData = new FormData();
-                            formData.append('action', 'update_status');
-                            formData.append('lecon_id', leconId);
-                            formData.append('is_published', newStatus);
+                let formData = new FormData();
+                formData.append('action', 'update_status');
+                formData.append('lecon_id', leconId);
+                formData.append('is_published', newStatus);
 
-                            fetch('mes_cours_lessons.php', {
-                                    method: 'POST',
-                                    body: formData
-                                })
-                                .then(response => response.json())
-                                .then(data => {
-                                    if (data.success) {
-                                        selectElement.style.borderColor = '#198754';
-                                        setTimeout(() => {
-                                            selectElement.style.borderColor = '';
-                                        }, 1500);
-                                    } else {
-                                        alert('Erreur: ' + (data.message || 'Inconnue'));
-                                    }
-                                });
-                        });
-                    });
-
-                    document.querySelectorAll('.view-btn').forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            document.getElementById('modalCours').textContent = this
-                                .getAttribute(
-                                    'data-cours');
-                            document.getElementById('modalLecon').textContent = this
-                                .getAttribute(
-                                    'data-lecon');
-                            document.getElementById('modalType').textContent = this
-                                .getAttribute(
-                                    'data-type');
-                        });
-                    });
-
-                    document.querySelectorAll('.edit-btn').forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            document.getElementById('editLeconId').value = this.getAttribute(
-                                'data-id');
-                            document.getElementById('editTitreLecon').value = this.getAttribute(
-                                'data-titre');
-                            document.getElementById('editPubCheck').checked = (this
-                                .getAttribute(
-                                    'data-pub') === '1');
-                        });
-                    });
-
-                    document.querySelectorAll('.delete-btn').forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            if (confirm('Voulez-vous vraiment supprimer cette leçon ?')) {
-                                let leconId = this.getAttribute('data-id');
-                                let formData = new FormData();
-                                formData.append('action', 'delete_lecon');
-                                formData.append('lecon_id', leconId);
-
-                                fetch('mes_cours_lessons.php', {
-                                        method: 'POST',
-                                        body: formData
-                                    })
-                                    .then(response => response.json())
-                                    .then(data => {
-                                        if (data.success) {
-                                            location.reload();
-                                        } else {
-                                            alert('Erreur: ' + (data.message ||
-                                                'Inconnue'));
-                                        }
-                                    });
-                            }
-                        });
-                    });
+                fetch('mes_cours_lessons.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        selectElement.style.borderColor = '#198754';
+                        setTimeout(() => { selectElement.style.borderColor = ''; }, 1500);
+                    } else {
+                        alert('Erreur: ' + (data.message || 'Inconnue'));
+                    }
                 });
-                </script>
+            });
+        });
+
+        // Modal de visualisation avec intégration dynamique du lien vers le fichier joint
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.getElementById('modalCours').textContent = this.getAttribute('data-cours');
+                document.getElementById('modalLecon').textContent = this.getAttribute('data-lecon');
+                document.getElementById('modalType').textContent = this.getAttribute('data-type');
+                
+                let fichierPath = this.getAttribute('data-fichier');
+                let fileContainer = document.getElementById('modalFileContainer');
+                
+                if (fichierPath && fichierPath.trim() !== '') {
+                    fileContainer.innerHTML = `<a href="${fichierPath}" target="_blank" class="btn btn-sm btn-primary w-100"><i class="bi bi-box-arrow-up-right me-2"></i> Ouvrir la pièce jointe</a>`;
+                } else {
+                    fileContainer.innerHTML = `<span class="text-muted small">Aucun fichier joint à cette leçon.</span>`;
+                }
+            });
+        });
+
+        // Modal de modification
+        document.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.getElementById('editLeconId').value = this.getAttribute('data-id');
+                document.getElementById('editTitreLecon').value = this.getAttribute('data-titre');
+                document.getElementById('editPubCheck').checked = (this.getAttribute('data-pub') === '1');
+            });
+        });
+
+        // Suppression de leçon
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (confirm('Voulez-vous vraiment supprimer cette leçon ?')) {
+                    let leconId = this.getAttribute('data-id');
+                    let formData = new FormData();
+                    formData.append('action', 'delete_lecon');
+                    formData.append('lecon_id', leconId);
+
+                    fetch('mes_cours_lessons.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            location.reload();
+                        } else {
+                            alert('Erreur: ' + (data.message || 'Inconnue'));
+                        }
+                    });
+                }
+            });
+        });
+    });
+    </script>
 </body>
 
 </html>

@@ -9,11 +9,33 @@ require_once __DIR__ . '/../database/db_connect.php';
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 $codeEcole = $_SESSION['code_ecole'] ?? '';
-
 $id = isset($_GET['eleve']) && ctype_digit($_GET['eleve']) ? (int)$_GET['eleve'] : 0;
 
 if ($id <= 0) {
     exit("ID invalide.");
+}
+
+// ============================
+// TRAITEMENT DU CHANGEMENT DE STATUT (POST)
+// ============================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_statut'])) {
+    $nouveauStatut = $_POST['action_statut'] === 'valider' ? 'valider' : 'invalide';
+    try {
+        $updateSql = "UPDATE students SET statut = :statut WHERE id = :id";
+        $paramsUpdate = [':statut' => $nouveauStatut, ':id' => $id];
+        if ($codeEcole) {
+            $updateSql .= " AND code_ecole = :ce";
+            $paramsUpdate[':ce'] = $codeEcole;
+        }
+        $stUp = $pdo->prepare($updateSql);
+        $stUp->execute($paramsUpdate);
+        
+        // Redirection pour éviter la resoumission du formulaire
+        header("Location: students-show.php?eleve=" . $id);
+        exit;
+    } catch (Throwable $e) {
+        $erreurStatut = "Erreur lors de la modification du statut.";
+    }
 }
 
 // ============================
@@ -53,9 +75,8 @@ if (!$student) {
 }
 
 // ============================
-// FINANCES (STRUCTURE PRÊTE)
+// FINANCES
 // ============================
-// ⚠️ adapte selon ta table (payments / fees / transactions)
 $payments = [];
 
 try {
@@ -87,7 +108,7 @@ try {
 <head>
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
-    <title>MyKelasi | All Students</title>
+    <title>MyKelasi | Fiche Élève</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Favicon -->
@@ -115,24 +136,76 @@ try {
 
             <div class="dashboard-content-one">
 
-                <div class="breadcrumbs-area d-flex align-items-center justify-content-between">
+                <!-- Fil d'ariane et Boutons d'actions (Modifier, Supprimer, Retour) -->
+                <div class="breadcrumbs-area d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div>
-                        <h3><?= h($student['first_name'].' '.$student['last_name']) ?></h3>
+                        <h3>
+                            <?= h($student['first_name'].' '.$student['last_name']) ?>
+                            <?php if (($student['statut'] ?? 'invalide') === 'valider'): ?>
+                            <span class="badge badge-success font-size-12 ml-2">Validé</span>
+                            <?php else: ?>
+                            <span class="badge badge-danger font-size-12 ml-2">Invalide</span>
+                            <?php endif; ?>
+                        </h3>
                         <p class="muted mb-0">Voir les informations détaillées de l'élève</p>
                     </div>
-                    <a href="all-students.php" class="btn btn-md btn-secondary">← Retour</a>
+                    <div class="d-block gap-2 me-2">
+                        <!-- Bouton Valider / Invalider -->
+                        <form method="POST" class="d-inline">
+                            <?php if (($student['statut'] ?? 'invalide') === 'valider'): ?>
+                            <input type="hidden" name="action_statut" value="invalide">
+                            <button type="submit" class="btn btn-warning btn-lg text-white"
+                                onclick="return confirm('Voulez-vous vraiment invalider cet élève ?');">
+                                <i class="fas fa-ban"></i> Invalider
+                            </button>
+                            <?php else: ?>
+                            <input type="hidden" name="action_statut" value="valider">
+                            <button type="submit" class="btn btn-success btn-lg"
+                                onclick="return confirm('Voulez-vous valider cet élève ?');">
+                                <i class="fas fa-check-circle"></i> Valider
+                            </button>
+                            <?php endif; ?>
+                        </form>
+
+                        <!-- Bouton Modifier -->
+                        <a href="admit-form.php?id=<?= $student['id'] ?>" class="btn btn-primary btn-lg me-2">
+                            <i class="fas fa-edit"></i> Modifier
+                        </a>
+
+                        <!-- Bouton Supprimer -->
+                        <a href="delete_student.php?id=<?= $student['id'] ?>" class="btn btn-danger btn-lg"
+                            onclick="return confirm('Êtes-vous sûr de vouloir supprimer définitivement cet élève ?');">
+                            <i class="fas fa-trash-alt"></i> Supprimer
+                        </a>
+
+                        <!-- Retour -->
+                        <a href="all-students.php" class="btn btn-secondary btn-lg">← Retour</a>
+                    </div>
                 </div>
-                
-                <div class="row">
+
+                <?php if (isset($erreurStatut)): ?>
+                <div class="alert alert-danger mt-3"><?= h($erreurStatut) ?></div>
+                <?php endif; ?>
+
+                <div class="row mt-4">
                     <!-- ===================== -->
-                <!-- INFOS GÉNÉRALES -->
-                <!-- ===================== -->
+                    <!-- INFOS GÉNÉRALES -->
+                    <!-- ===================== -->
                     <div class="col-lg-6 col-sm-12">
                         <div class="card mb-3">
                             <div class="card-body">
                                 <h5>Informations générales</h5>
                                 <hr>
 
+                                <!-- <p><span class="label">Statut :</span>
+                                    <strong>
+                                        <?php if (($student['statut'] ?? 'invalide') === 'valider'): ?>
+                                        <span class="text-success">Validé</span>
+                                        <?php else: ?>
+                                        <span class="text-danger">Invalide</span>
+                                        <?php endif; ?>
+                                    </strong>
+                                </p> -->
                                 <p><span class="label">Username :</span> <?= h($student['username']) ?></p>
                                 <p><span class="label">Email :</span> <?= h($student['email']) ?></p>
                                 <p><span class="label">Téléphone :</span> <?= h($student['phone']) ?></p>
@@ -207,7 +280,6 @@ try {
     </div>
 
     <?php require_once('layout/footer.php'); ?>
-
 
     <!-- JS -->
     <script src="../js/jquery-3.3.1.min.js"></script>
