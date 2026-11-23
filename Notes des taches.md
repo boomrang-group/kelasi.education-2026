@@ -232,3 +232,9 @@ CREATE TABLE IF NOT EXISTS `quiz_resultats_repetitorat` (
  CONSTRAINT `fk_qrr_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quiz_repetitorat` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
  CONSTRAINT `fk_qrr_student` FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+#17.11.2026
+ALTER TABLE `lecons_repetitorat` 
+ADD COLUMN `fichier_path` VARCHAR(255) DEFAULT NULL AFTER `ordre`,
+ADD COLUMN `type_contenu` ENUM('pdf','image','audio','video','autre') DEFAULT NULL AFTER `fichier_path`;

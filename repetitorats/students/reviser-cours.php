@@ -9,6 +9,36 @@ if (!$lecon) {
     header('Location: mes_cours.php?msg=not_found');
     exit;
 }
+
+// Résolution des noms de fichiers physiques à partir des tables de contenu si nécessaire
+if (!empty($contenus) && isset($pdo)) {
+    foreach ($contenus as &$cnt) {
+        $cnt['filename'] = '';
+        $t = $cnt['type_contenu'];
+        $cid = (int)$cnt['contenu_id'];
+        
+        try {
+            if ($t === 'pdf') {
+                $stF = $pdo->prepare('SELECT filename FROM pdfs WHERE id = :id LIMIT 1');
+                $stF->execute([':id' => $cid]);
+                $cnt['filename'] = $stF->fetchColumn() ?: '';
+            } elseif ($t === 'image') {
+                $stF = $pdo->prepare('SELECT filename FROM images WHERE id = :id LIMIT 1');
+                $stF->execute([':id' => $cid]);
+                $cnt['filename'] = $stF->fetchColumn() ?: '';
+            } elseif ($t === 'audio') {
+                $stF = $pdo->prepare('SELECT fichier FROM audios WHERE id = :id LIMIT 1');
+                $stF->execute([':id' => $cid]);
+                $cnt['filename'] = $stF->fetchColumn() ?: '';
+            } elseif ($t === 'video') {
+                $stF = $pdo->prepare('SELECT filename FROM videos WHERE id = :id LIMIT 1');
+                $stF->execute([':id' => $cid]);
+                $cnt['filename'] = $stF->fetchColumn() ?: '';
+            }
+        } catch (Throwable $e) {}
+    }
+    unset($cnt);
+}
 ?>
 <!doctype html>
 <html class="no-js" lang="fr">
@@ -64,7 +94,7 @@ if (!$lecon) {
 
                 <div class="card-box">
                     <div class="lesson-header">
-                        <span class="badge bg-primary mb-2 text-uppercase"><?= h($lecon['cours_nom']) ?></span>
+                        <span class="badge bg-primary mb-2 text-uppercase text-white"><?= h($lecon['cours_nom']) ?></span>
                         <h2 class="text-dark fw-bold"><?= h($lecon['titre']) ?></h2>
                         <small class="text-muted"><i class="bi bi-calendar3 me-1"></i> Publié le : <?= h($lecon['created_at']) ?></small>
                     </div>
@@ -73,44 +103,57 @@ if (!$lecon) {
                     <div class="lesson-body">
                         <?php if (!empty($contenus)): ?>
                             <div class="alert alert-info mb-4">
-                                <i class="bi bi-info-circle-fill me-2">></i> Cette leçon contient <strong><?= count($contenus) ?></strong> support(s) multimédia(s).
+                                <i class="bi bi-info-circle-fill me-2"></i> Cette leçon contient <strong><?= count($contenus) ?></strong> support(s) multimédia(s).
                             </div>
 
                             <div class="row g-4">
-                                <?php foreach ($contenus as $idx => $cnt): ?>
+                                <?php foreach ($contenus as $idx => $cnt): 
+                                    $filePath = !empty($cnt['filename']) ? '../../uploads/cours_repetitorats/' . $cnt['filename'] : '';
+                                ?>
                                     <div class="col-12">
                                         <div class="card border p-3 shadow-sm bg-light">
                                             <h5 class="fw-bold text-secondary mb-3">
-                                                Support #<?= $idx + 1 ?> <span class="badge bg-dark text-uppercase ms-2"><?= h($cnt['type_contenu']) ?></span>
+                                                Support #<?= $idx + 1 ?> <span class="badge bg-dark text-uppercase text-white ms-2"><?= h($cnt['type_contenu']) ?></span>
                                             </h5>
                                             
-                                            <!-- Affichage selon le type de contenu -->
-                                            <?php if ($cnt['type_contenu'] === 'pdf'): ?>
-                                                <div class="ratio ratio-16x9">
-                                                    <iframe src="../../uploads/pdf/<?= h($cnt['contenu_id']) ?>" class="border rounded"></iframe>
-                                                </div>
-                                                <div class="mt-2 text-end">
-                                                    <a href="../../uploads/pdf/<?= h($cnt['contenu_id']) ?>" target="_blank" class="btn btn-sm btn-dark">
-                                                        <i class="bi bi-download me-1"></i> Télécharger le PDF
-                                                    </a>
-                                                </div>
-                                            <?php elseif ($cnt['type_contenu'] === 'image'): ?>
-                                                <div class="text-center">
-                                                    <img src="../../uploads/images/<?= h($cnt['contenu_id']) ?>" alt="Support image" class="img-fluid rounded shadow-sm" style="max-height: 500px;">
-                                                </div>
-                                            <?php elseif ($cnt['type_contenu'] === 'video'): ?>
-                                                <div class="ratio ratio-16x9">
-                                                    <video controls class="rounded shadow-sm">
-                                                        <source src="../../uploads/videos/<?= h($cnt['contenu_id']) ?>" type="video/mp4">
-                                                        Votre navigateur ne supporte pas la lecture de vidéos.
-                                                    </video>
-                                                </div>
-                                            <?php elseif ($cnt['type_contenu'] === 'audio'): ?>
-                                                <div class="p-3 text-center bg-white rounded border">
-                                                    <audio controls class="w-100">
-                                                        <source src="../../uploads/audios/<?= h($cnt['contenu_id']) ?>" type="audio/mpeg">
-                                                        Votre navigateur ne supporte pas la lecture audio.
-                                                    </audio>
+                                            <?php if ($filePath && file_exists(__DIR__ . '/../../uploads/cours_repetitorats/' . $cnt['filename'])): ?>
+                                                <!-- Affichage selon le type de contenu -->
+                                                <?php if ($cnt['type_contenu'] === 'pdf'): ?>
+                                                    <div class="ratio ratio-16x9">
+                                                        <iframe src="<?= h($filePath) ?>" class="border rounded"></iframe>
+                                                    </div>
+                                                    <div class="mt-3 text-end">
+                                                        <a href="<?= h($filePath) ?>" target="_blank" class="btn btn-lg btn-dark">
+                                                            <i class="bi bi-box-arrow-up-right me-1"></i> Ouvrir / Télécharger le PDF
+                                                        </a>
+                                                    </div>
+                                                <?php elseif ($cnt['type_contenu'] === 'image'): ?>
+                                                    <div class="text-center">
+                                                        <img src="<?= h($filePath) ?>" alt="Support image" class="img-fluid rounded shadow-sm" style="max-height: 500px;">
+                                                    </div>
+                                                    <div class="mt-3 text-end">
+                                                        <a href="<?= h($filePath) ?>" target="_blank" class="btn btn-sm btn-dark">
+                                                            <i class="bi bi-box-arrow-up-right me-1"></i> Afficher l'image en grand
+                                                        </a>
+                                                    </div>
+                                                <?php elseif ($cnt['type_contenu'] === 'video'): ?>
+                                                    <div class="ratio ratio-16x9">
+                                                        <video controls class="rounded shadow-sm">
+                                                            <source src="<?= h($filePath) ?>" type="video/mp4">
+                                                            Votre navigateur ne supporte pas la lecture de vidéos.
+                                                        </video>
+                                                    </div>
+                                                <?php elseif ($cnt['type_contenu'] === 'audio'): ?>
+                                                    <div class="p-3 text-center bg-white rounded border">
+                                                        <audio controls class="w-100">
+                                                            <source src="<?= h($filePath) ?>" type="audio/mpeg">
+                                                            Votre navigateur ne supporte pas la lecture audio.
+                                                        </audio>
+                                                    </div>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <div class="alert alert-warning mb-0">
+                                                    <i class="bi bi-exclamation-triangle me-2"></i> Le fichier associé est introuvable sur le serveur.
                                                 </div>
                                             <?php endif; ?>
                                         </div>
